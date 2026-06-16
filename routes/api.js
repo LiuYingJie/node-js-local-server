@@ -30,6 +30,9 @@ router.get('/preview/:id', async (req, res, next) => {
 
     const filePath = getFilePath(file);
     if (!fs.existsSync(filePath)) return res.status(404).send('文件不存在');
+    if (!(await canAccessFolder(req, file.folderId ?? null, 'read'))) {
+      return res.status(403).send('没有访问权限');
+    }
 
     const content = await fsPromises.readFile(filePath, 'utf-8');
     const canEdit = await canAccessFolder(req, file.folderId ?? null, 'update');
@@ -95,8 +98,11 @@ router.put('/api/files/:id/content', requireLogin, express.json({ limit: '6mb' }
   }
 });
 
-async function sendFileRecord(file, res, next) {
+async function sendFileRecord(file, req, res, next) {
   if (!file) return res.status(404).json({ error: '文件不存在' });
+  if (!(await canAccessFolder(req, file.folderId ?? null, 'read'))) {
+    return res.status(403).json({ error: '没有访问权限' });
+  }
   const filePath = getFilePath(file);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: '文件不存在' });
   return sendFileDownload(res, filePath, file.fileName, file.size, next);
@@ -104,7 +110,7 @@ async function sendFileRecord(file, res, next) {
 
 router.get(/^\/download\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i, async (req, res, next) => {
   try {
-    await sendFileRecord(await getFileById(req.params[0]), res, next);
+    await sendFileRecord(await getFileById(req.params[0]), req, res, next);
   } catch (err) {
     next(err);
   }
@@ -113,7 +119,7 @@ router.get(/^\/download\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-
 router.get(/^\/download\/(.+)$/, async (req, res, next) => {
   try {
     const relPath = decodeURIComponent(req.params[0] || '');
-    await sendFileRecord(await getFileByRelativePath(relPath), res, next);
+    await sendFileRecord(await getFileByRelativePath(relPath), req, res, next);
   } catch (err) {
     next(err);
   }

@@ -287,6 +287,21 @@
   margin: 4px 0;
 }
 
+.context-menu-tip {
+  position: fixed;
+  z-index: 201;
+  max-width: 260px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+}
+
 .drop-overlay {
   position: fixed;
   inset: 0;
@@ -312,7 +327,7 @@ body.is-admin .admin-only {
   display: inline-block;
 }
 
-body:not(.is-admin) .admin-only {
+body:not(.is-admin):not(.can-write) .admin-only {
   display: none !important;
 }
 

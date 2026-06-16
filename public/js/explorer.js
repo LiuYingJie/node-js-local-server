@@ -10,6 +10,7 @@
     selected: new Set(), // "folder:id" | "file:id"
     viewMode: localStorage.getItem('viewMode') || 'grid',
     isAdmin: false,
+    canWrite: false,
     navHistory: [null],
     navIndex: 0,
     lastClickedIndex: -1,
@@ -28,6 +29,7 @@
     statusText: document.getElementById('status-text'),
     selectionInfo: document.getElementById('selection-info'),
     contextMenu: document.getElementById('context-menu'),
+    contextMenuTip: document.getElementById('context-menu-tip'),
     selectionBox: document.getElementById('selection-box'),
     dropOverlay: document.getElementById('drop-overlay'),
     userBadge: document.getElementById('user-badge'),
@@ -73,7 +75,7 @@
   }
 
   function getIcon(entry) {
-    if (entry.type === 'folder') return '📁';
+    if (entry.type === 'folder') return entry.private ? '🔒' : '📁';
     return FILE_ICONS[getExt(entry.name)] || '📄';
   }
 
@@ -118,6 +120,7 @@
   function applyAdminUI() {
     const loggedIn = Boolean(state.user);
     document.body.classList.toggle('is-admin', state.isAdmin);
+    document.body.classList.toggle('can-write', state.canWrite);
     els.userBadge.textContent = state.isAdmin ? '管理员' : '访客';
     if (state.user) {
       const roleText = state.user.role === 'superadmin' ? '超管' : (state.user.role === 'admin' ? '管理员' : '用户');
@@ -153,6 +156,7 @@
     state.files = data.files;
     state.breadcrumb = data.breadcrumb;
     state.isAdmin = data.isAdmin;
+    state.canWrite = Boolean(data.canWrite);
     state.user = data.user || state.user;
     state.filtered = null;
     state.selected.clear();
@@ -317,10 +321,6 @@
     }).filter(Boolean);
   }
 
-  function hideContextMenu() {
-    els.contextMenu.style.display = 'none';
-  }
-
   function onContextMenu(e, el) {
     e.preventDefault();
     const key = el.dataset.key;
@@ -348,7 +348,7 @@
       items.push({ label: '查看下载链接', action: () => openDownloadLink(single) });
     }
 
-    if (state.isAdmin) {
+    if (state.canWrite) {
       if (items.length) items.push({ sep: true });
       if (selected.length === 1) {
         items.push({ label: '重命名', action: () => openRename(single) });
@@ -360,12 +360,37 @@
     showContextMenu(items, e.clientX, e.clientY);
   }
 
+  const PRIVATE_FOLDER_TIP = '私人文件夹仅创建者本人可访问。除创建者外，其他人均无法查看或进行增删改操作。';
+
+  function hideContextMenuTip() {
+    if (els.contextMenuTip) els.contextMenuTip.style.display = 'none';
+  }
+
+  function showContextMenuTip(text, anchorEl) {
+    if (!els.contextMenuTip || !text) return;
+    els.contextMenuTip.textContent = text;
+    els.contextMenuTip.style.display = 'block';
+    const rect = anchorEl.getBoundingClientRect();
+    const tipRect = els.contextMenuTip.getBoundingClientRect();
+    let left = rect.right + 8;
+    let top = rect.top;
+    if (left + tipRect.width > window.innerWidth - 8) {
+      left = rect.left - tipRect.width - 8;
+    }
+    if (top + tipRect.height > window.innerHeight - 8) {
+      top = window.innerHeight - tipRect.height - 8;
+    }
+    els.contextMenuTip.style.left = Math.max(8, left) + 'px';
+    els.contextMenuTip.style.top = Math.max(8, top) + 'px';
+  }
+
   function showContextMenu(items, clientX, clientY) {
     if (!items.length) return;
+    hideContextMenuTip();
 
     els.contextMenu.innerHTML = items.map((item) => {
       if (item.sep) return '<div class="context-menu-sep"></div>';
-      return `<div class="context-menu-item${item.danger ? ' danger' : ''}">${item.label}</div>`;
+      return `<div class="context-menu-item${item.danger ? ' danger' : ''}${item.tip ? ' has-tip' : ''}">${item.label}</div>`;
     }).join('');
 
     els.contextMenu.style.display = 'block';
@@ -373,7 +398,12 @@
     let idx = 0;
     items.forEach((item) => {
       if (item.sep) return;
-      menuItems[idx++].addEventListener('click', () => { hideContextMenu(); item.action(); });
+      const el = menuItems[idx++];
+      el.addEventListener('click', () => { hideContextMenu(); item.action(); });
+      if (item.tip) {
+        el.addEventListener('mouseenter', () => showContextMenuTip(item.tip, el));
+        el.addEventListener('mouseleave', hideContextMenuTip);
+      }
     });
 
     const x = Math.min(clientX, window.innerWidth - 180);
@@ -382,15 +412,43 @@
     els.contextMenu.style.top = y + 'px';
   }
 
+  function hideContextMenu() {
+    els.contextMenu.style.display = 'none';
+    hideContextMenuTip();
+  }
+
   function onBlankContextMenu(e) {
     if (e.target.closest('.entry-item')) return;
     e.preventDefault();
     state.selected.clear();
     render();
-    if (!state.isAdmin) return;
-    showContextMenu([
-      { label: '创建文件夹', action: () => els.btnNewFolder.click() },
-    ], e.clientX, e.clientY);
+    const items = [];
+    if (state.isAdmin) {
+      items.push({ label: '创建文件夹', action: () => createFolder(false) });
+    }
+    if (state.user) {
+      items.push({
+        label: '创建文件夹(私)',
+        tip: PRIVATE_FOLDER_TIP,
+        action: () => createFolder(true),
+      });
+    }
+    if (!items.length) return;
+    showContextMenu(items, e.clientX, e.clientY);
+  }
+
+  async function createFolder(isPrivate) {
+    const name = prompt(isPrivate ? '私人文件夹名称' : '文件夹名称');
+    if (!name?.trim()) return;
+    try {
+      await api('/api/folders', {
+        method: 'POST',
+        body: JSON.stringify({ name: name.trim(), parentId: state.folderId, private: isPrivate }),
+      });
+      loadEntries(state.folderId);
+    } catch (err) {
+      alert(err.message);
+    }
   }
 
   function getDownloadUrl(entry) {
@@ -446,7 +504,7 @@
   }
 
   async function openMoveModal(entries) {
-    if (!state.isAdmin || !entries.length) return;
+    if (!state.canWrite || !entries.length) return;
     state.moveTargetFolderId = null;
     state.moveTargetPath = '';
     els.btnConfirmMove.disabled = true;
@@ -565,7 +623,7 @@
   }
 
   async function uploadFiles(fileList) {
-    if (!state.isAdmin || !fileList.length) return;
+    if (!state.canWrite || !fileList.length) return;
 
     const formData = new FormData();
     for (const f of fileList) formData.append('files', f);
@@ -739,16 +797,7 @@
     }
   });
 
-  els.btnNewFolder.addEventListener('click', async () => {
-    const name = prompt('文件夹名称');
-    if (!name?.trim()) return;
-    try {
-      await api('/api/folders', { method: 'POST', body: JSON.stringify({ name: name.trim(), parentId: state.folderId }) });
-      loadEntries(state.folderId);
-    } catch (err) {
-      alert(err.message);
-    }
-  });
+  els.btnNewFolder.addEventListener('click', () => createFolder(false));
 
   els.btnLogin.addEventListener('click', () => {
     els.loginModal.style.display = 'flex';
@@ -780,8 +829,10 @@
   els.btnLogout.addEventListener('click', async () => {
     await api('/api/logout', { method: 'POST' });
     state.isAdmin = false;
+    state.canWrite = false;
     state.user = null;
     applyAdminUI();
+    loadEntries(state.folderId);
     setStatus('已退出');
   });
 
@@ -830,13 +881,13 @@
   // 拖拽上传
   let dragCounter = 0;
   document.addEventListener('dragenter', (e) => {
-    if (!state.isAdmin) return;
+    if (!state.canWrite) return;
     e.preventDefault();
     dragCounter++;
     els.dropOverlay.style.display = 'flex';
   });
   document.addEventListener('dragleave', (e) => {
-    if (!state.isAdmin) return;
+    if (!state.canWrite) return;
     e.preventDefault();
     dragCounter--;
     if (dragCounter <= 0) {
@@ -844,9 +895,9 @@
       els.dropOverlay.style.display = 'none';
     }
   });
-  document.addEventListener('dragover', (e) => { if (state.isAdmin) e.preventDefault(); });
+  document.addEventListener('dragover', (e) => { if (state.canWrite) e.preventDefault(); });
   document.addEventListener('drop', (e) => {
-    if (!state.isAdmin) return;
+    if (!state.canWrite) return;
     e.preventDefault();
     dragCounter = 0;
     els.dropOverlay.style.display = 'none';
@@ -855,10 +906,10 @@
 
   // 键盘快捷键
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Delete' && state.isAdmin && state.selected.size) {
+    if (e.key === 'Delete' && state.canWrite && state.selected.size) {
       deleteSelected();
     }
-    if (e.key === 'F2' && state.isAdmin && state.selected.size === 1) {
+    if (e.key === 'F2' && state.canWrite && state.selected.size === 1) {
       openRename(getSelectedEntries()[0]);
     }
     if (e.key === 'Enter' && state.selected.size === 1) {
