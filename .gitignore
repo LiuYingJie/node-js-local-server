@@ -5,8 +5,8 @@ yarn-error.log*
 pnpm-debug.log*
 *.log
 logs/
-data/*.log
-data/users.json
+data/*
+!data/.gitkeep
 storage/temp/
 storage/files/*
 !storage/files/.gitkeep
