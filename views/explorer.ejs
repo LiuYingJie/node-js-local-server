@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>局域网文件服务器</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/explorer.css">
+</head>
+<body class="explorer-page">
+  <div class="explorer-app" id="explorer-app">
+    <header class="explorer-toolbar">
+      <div class="toolbar-left">
+        <button type="button" class="tb-btn" id="btn-back" title="后退" disabled>←</button>
+        <button type="button" class="tb-btn" id="btn-up" title="上级">↑</button>
+        <div class="breadcrumb" id="breadcrumb"></div>
+      </div>
+      <div class="toolbar-center">
+        <div class="search-box">
+          <input type="text" id="search-input" placeholder="搜索当前目录..." />
+        </div>
+      </div>
+      <div class="toolbar-right">
+        <button type="button" class="tb-btn view-btn active" data-view="grid" title="图标">▦</button>
+        <button type="button" class="tb-btn view-btn" data-view="list" title="列表">☰</button>
+        <button type="button" class="tb-btn admin-only" id="btn-new-folder" title="新建文件夹">+ 文件夹</button>
+        <span class="user-badge" id="user-badge">访客</span>
+        <button type="button" class="tb-btn" id="btn-login">登录</button>
+        <button type="button" class="tb-btn admin-only" id="btn-logout" style="display:none">退出</button>
+      </div>
+    </header>
+
+    <main class="explorer-main" id="explorer-main">
+      <div class="empty-hint" id="empty-hint" style="display:none">此文件夹为空</div>
+      <div class="entry-grid" id="entry-container"></div>
+    </main>
+
+    <div class="status-bar">
+      <span id="status-text">就绪</span>
+      <span id="selection-info"></span>
+    </div>
+
+    <!-- 拖拽上传遮罩 -->
+    <div class="drop-overlay admin-only" id="drop-overlay" style="display:none">
+      <div class="drop-overlay-inner">松开鼠标上传文件</div>
+    </div>
+
+    <!-- 右键菜单 -->
+    <div class="context-menu" id="context-menu" style="display:none"></div>
+
+    <!-- 登录弹窗 -->
+    <div class="modal" id="login-modal" style="display:none">
+      <div class="modal-backdrop"></div>
+      <div class="modal-box">
+        <h3>管理员登录</h3>
+        <div class="alert alert-error" id="login-error" style="display:none"></div>
+        <form id="login-form">
+          <div class="form-group">
+            <label>用户名</label>
+            <input type="text" name="username" required autofocus>
+          </div>
+          <div class="form-group">
+            <label>密码</label>
+            <input type="password" name="password" required>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" id="login-cancel">取消</button>
+            <button type="submit" class="btn btn-primary">登录</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 重命名弹窗 -->
+    <div class="modal" id="rename-modal" style="display:none">
+      <div class="modal-backdrop"></div>
+      <div class="modal-box">
+        <h3 id="rename-title">重命名</h3>
+        <form id="rename-form">
+          <input type="hidden" id="rename-id">
+          <input type="hidden" id="rename-type">
+          <div class="form-group">
+            <input type="text" id="rename-value" required>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary modal-close">取消</button>
+            <button type="submit" class="btn btn-primary">确定</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 发布版本弹窗 -->
+    <div class="modal" id="release-modal" style="display:none">
+      <div class="modal-backdrop"></div>
+      <div class="modal-box">
+        <h3>设为软件发布版本</h3>
+        <p class="modal-file" id="release-file-name"></p>
+        <form id="release-form">
+          <input type="hidden" id="release-file-id">
+          <div class="form-group">
+            <label>版本号</label>
+            <input type="text" id="release-version" required placeholder="1.0.0">
+          </div>
+          <div class="form-group">
+            <label>更新说明</label>
+            <textarea id="release-desc"></textarea>
+          </div>
+          <div class="form-group form-check">
+            <input type="checkbox" id="release-force">
+            <label for="release-force" style="margin:0">强制更新</label>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary modal-close">取消</button>
+            <button type="submit" class="btn btn-primary">确认</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.EXPLORER_CONFIG = { maxUploadSizeMB: <%= maxUploadSizeMB %> };
+  </script>
+  <script src="/js/explorer.js"></script>
+</body>
+</html>

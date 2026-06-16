@@ -1,0 +1,23 @@
+{
+  "name": "node-js-local-server",
+  "version": "1.0.0",
+  "description": "本地文件更新/下载服务器",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LiuYingJie/node-js-local-server.git"
+  },
+  "keywords": ["update-server", "file-server", "express"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "ejs": "^3.1.10",
+    "express": "^5.2.1",
+    "express-session": "^1.18.1",
+    "multer": "^2.2.0"
+  }
+}
