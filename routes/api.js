@@ -1,7 +1,7 @@
 const express = require('express');
 const fs = require('fs');
 const fsPromises = require('fs/promises');
-const { getFileById, getFilePath } = require('../lib/fileService');
+const { getFileById, getFileByRelativePath, getFilePath } = require('../lib/fileService');
 const { getVersionInfo, getReleaseFile } = require('../lib/releaseService');
 const { sendFileDownload } = require('../lib/downloadHelper');
 const { requireLogin } = require('../middleware/auth');
@@ -108,25 +108,33 @@ router.put('/api/files/:id/content', requireLogin, express.json({ limit: '6mb' }
   }
 });
 
-router.get('/download/:id', async (req, res, next) => {
+async function sendFileRecord(file, res, next) {
+  if (!file) return res.status(404).json({ error: '文件不存在' });
+  const filePath = getFilePath(file);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: '文件不存在' });
+  return sendFileDownload(res, filePath, file.fileName, file.size, next);
+}
+
+router.get('/download/latest', async (req, res, next) => {
   try {
-    const file = await getFileById(req.params.id);
-    if (!file) return res.status(404).json({ error: '文件不存在' });
-    const filePath = getFilePath(file);
-    if (!fs.existsSync(filePath)) return res.status(404).json({ error: '文件不存在' });
-    sendFileDownload(res, filePath, file.fileName, file.size, next);
+    await sendFileRecord(await getReleaseFile(), res, next);
   } catch (err) {
     next(err);
   }
 });
 
-router.get('/download/latest', async (req, res, next) => {
+router.get(/^\/download\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i, async (req, res, next) => {
   try {
-    const file = await getReleaseFile();
-    if (!file) return res.status(404).json({ error: '暂未设置发布版本' });
-    const filePath = getFilePath(file);
-    if (!fs.existsSync(filePath)) return res.status(404).json({ error: '文件不存在' });
-    sendFileDownload(res, filePath, file.fileName, file.size, next);
+    await sendFileRecord(await getFileById(req.params[0]), res, next);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get(/^\/download\/(.+)$/, async (req, res, next) => {
+  try {
+    const relPath = decodeURIComponent(req.params[0] || '');
+    await sendFileRecord(await getFileByRelativePath(relPath), res, next);
   } catch (err) {
     next(err);
   }

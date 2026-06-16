@@ -295,7 +295,8 @@
   }
 
   function downloadFile(id) {
-    window.open('/download/' + id, '_blank');
+    const entry = getAllEntries().find((item) => item.type === 'file' && item.id === id);
+    window.open(entry ? getDownloadUrl(entry) : '/download/' + id, '_blank');
   }
 
   function downloadSelected() {
@@ -393,7 +394,9 @@
   }
 
   function getDownloadUrl(entry) {
-    return location.origin + '/download/' + entry.id;
+    if (entry.downloadUrl) return entry.downloadUrl;
+    const rel = entry.relativePath || entry.name;
+    return location.origin + '/download/' + rel.split('/').map(encodeURIComponent).join('/');
   }
 
   function openDownloadLink(entry) {

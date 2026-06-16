@@ -29,7 +29,7 @@
           <button type="button" class="tb-btn primary" id="btn-save" style="display:none">保存</button>
           <button type="button" class="tb-btn" id="btn-cancel-edit" style="display:none">取消</button>
         <% } %>
-        <a class="tb-btn" href="/download/<%= file.id %>">下载</a>
+        <a class="tb-btn" href="/download/<%= String(file.relativePath || file.fileName).split('/').map(encodeURIComponent).join('/') %>">下载</a>
       </div>
     </header>
 
