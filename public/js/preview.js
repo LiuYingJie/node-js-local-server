@@ -8,6 +8,7 @@
     prev: document.getElementById('preview-search-prev'),
     next: document.getElementById('preview-search-next'),
     editor: document.getElementById('preview-editor'),
+    jsonEditor: document.getElementById('json-code-editor'),
     btnEdit: document.getElementById('btn-edit'),
     btnSave: document.getElementById('btn-save'),
     btnCancelEdit: document.getElementById('btn-cancel-edit'),
@@ -19,6 +20,8 @@
     activeIndex: -1,
     editing: false,
     savedContent: String(data.content || ''),
+    editBaseline: '',
+    jsonFoldRanges: new Map(),
   };
 
   function escapeHtml(value) {
@@ -28,6 +31,10 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  function escapeCodeLine(value) {
+    return escapeHtml(value).replace(/ /g, '&nbsp;') || '&nbsp;';
   }
 
   function escapeRegExp(value) {
@@ -134,6 +141,63 @@
     collectHits();
   }
 
+  function getFormattedJsonContent(content) {
+    try {
+      return JSON.stringify(JSON.parse(content || 'null'), null, 2);
+    } catch {
+      return String(content || '');
+    }
+  }
+
+  function getJsonFoldRanges(lines) {
+    const stack = [];
+    const ranges = new Map();
+    lines.forEach((line, index) => {
+      const trimmed = line.trim();
+      if (/[\{\[][,]?$/.test(trimmed)) {
+        stack.push({ line: index, char: trimmed.includes('{') ? '{' : '[' });
+      }
+      if (/^[\}\]][,]?$/.test(trimmed) && stack.length) {
+        const open = stack.pop();
+        if (index > open.line + 1) ranges.set(open.line, index);
+      }
+    });
+    return ranges;
+  }
+
+  function renderJsonEditor() {
+    const text = getFormattedJsonContent(state.savedContent);
+    state.editBaseline = text;
+    const lines = text.split(/\r?\n/);
+    state.jsonFoldRanges = getJsonFoldRanges(lines);
+    els.jsonEditor.innerHTML = lines.map((line, index) => {
+      const canFold = state.jsonFoldRanges.has(index);
+      return `<div class="json-edit-line" data-line="${index}">
+        <button type="button" class="json-fold-btn${canFold ? '' : ' empty'}" data-line="${index}" tabindex="-1">${canFold ? '▾' : ''}</button>
+        <span class="json-edit-no">${index + 1}</span>
+        <span class="json-edit-text" contenteditable="true" spellcheck="false">${escapeCodeLine(line)}</span>
+      </div>`;
+    }).join('');
+  }
+
+  function getJsonEditorContent() {
+    return Array.from(els.jsonEditor.querySelectorAll('.json-edit-text'))
+      .map((line) => line.textContent.replace(/\u00a0/g, ''))
+      .join('\n');
+  }
+
+  function toggleJsonFold(lineIndex) {
+    const end = state.jsonFoldRanges.get(lineIndex);
+    if (end == null) return;
+    const btn = els.jsonEditor.querySelector(`.json-fold-btn[data-line="${lineIndex}"]`);
+    const collapsed = btn.classList.toggle('collapsed');
+    btn.textContent = collapsed ? '▸' : '▾';
+    for (let i = lineIndex + 1; i < end; i++) {
+      const line = els.jsonEditor.querySelector(`.json-edit-line[data-line="${i}"]`);
+      if (line) line.style.display = collapsed ? 'none' : 'grid';
+    }
+  }
+
   function setStatus(message, danger) {
     els.error.textContent = message;
     els.error.style.display = message ? 'block' : 'none';
@@ -143,21 +207,30 @@
   function setEditing(editing) {
     if (!data.canEdit) return;
     state.editing = editing;
-    els.editor.style.display = editing ? 'block' : 'none';
+    const jsonEditing = editing && data.type === 'json';
+    const textEditing = editing && data.type !== 'json';
+    els.editor.style.display = textEditing ? 'block' : 'none';
+    els.jsonEditor.style.display = jsonEditing ? 'block' : 'none';
     els.content.style.display = editing ? 'none' : 'block';
     els.btnEdit.style.display = editing ? 'none' : 'inline-flex';
     els.btnSave.style.display = editing ? 'inline-flex' : 'none';
     els.btnCancelEdit.style.display = editing ? 'inline-flex' : 'none';
     document.getElementById('preview-search').style.display = editing ? 'none' : 'flex';
     if (editing) {
-      els.editor.value = state.savedContent;
-      els.editor.focus();
+      if (jsonEditing) {
+        renderJsonEditor();
+        els.jsonEditor.querySelector('.json-edit-text')?.focus();
+      } else {
+        els.editor.value = state.savedContent;
+        state.editBaseline = state.savedContent;
+        els.editor.focus();
+      }
     }
   }
 
   async function saveContent() {
     if (!state.editing) return;
-    const content = els.editor.value;
+    const content = data.type === 'json' ? getJsonEditorContent() : els.editor.value;
     try {
       const res = await fetch('/api/files/' + encodeURIComponent(data.fileId) + '/content', {
         method: 'PUT',
@@ -229,11 +302,17 @@
   els.next.addEventListener('click', () => moveHit(1));
   els.btnEdit?.addEventListener('click', () => setEditing(true));
   els.btnCancelEdit?.addEventListener('click', () => {
-    if (els.editor.value !== state.savedContent && !confirm('放弃未保存的修改？')) return;
+    const currentContent = data.type === 'json' ? getJsonEditorContent() : els.editor.value;
+    if (currentContent !== state.editBaseline && !confirm('放弃未保存的修改？')) return;
     setEditing(false);
     setStatus('');
   });
   els.btnSave?.addEventListener('click', () => saveContent());
+  els.jsonEditor?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.json-fold-btn');
+    if (!btn || btn.classList.contains('empty')) return;
+    toggleJsonFold(Number(btn.dataset.line));
+  });
 
   document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {

@@ -12,12 +12,13 @@
   {
     "id": "d6fb6d81-d78c-4a29-a304-32d9c5052857",
     "fileName": "test-upload.txt",
-    "md5": "4d0c3a5c33fd1a97b6074b0cc4bd5e76",
-    "size": 28,
+    "md5": "34cbcee6ff934b584cf9c6e8ccc4718b",
+    "size": 32,
     "desc": "test upload",
     "uploadTime": "2026-06-16 14:40:35",
     "folderId": null,
-    "relativePath": "test-upload.txt"
+    "relativePath": "test-upload.txt",
+    "updateTime": "2026-06-16 16:08:56"
   },
   {
     "id": "a4e55b22-1627-4275-b866-a26a2a8645e5",

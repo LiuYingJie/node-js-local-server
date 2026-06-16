@@ -143,6 +143,71 @@
   border-color: var(--primary);
 }
 
+.json-code-editor {
+  width: calc(100% - 32px);
+  height: calc(100vh - 108px);
+  margin: 0 16px;
+  padding: 6px 0;
+  overflow: auto;
+  background: #0b1117;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: Consolas, Monaco, 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.json-edit-line {
+  display: grid;
+  grid-template-columns: 24px 54px minmax(0, 1fr);
+  align-items: start;
+  min-height: 18px;
+  height: 18px;
+}
+
+.json-fold-btn {
+  width: 24px;
+  height: 18px;
+  line-height: 18px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.json-fold-btn:hover:not(.empty) {
+  color: var(--text);
+}
+
+.json-fold-btn.empty {
+  cursor: default;
+}
+
+.json-edit-no {
+  color: var(--text-muted);
+  text-align: right;
+  padding-right: 10px;
+  line-height: 18px;
+  user-select: none;
+  border-right: 1px solid var(--border);
+}
+
+.json-edit-text {
+  display: block;
+  min-height: 18px;
+  line-height: 18px;
+  white-space: pre;
+  padding: 0 10px;
+  outline: none;
+  overflow: hidden;
+}
+
+.json-edit-text:focus {
+  background: rgba(59, 130, 246, 0.12);
+}
+
 .text-line {
   display: grid;
   grid-template-columns: 64px minmax(0, 1fr);
