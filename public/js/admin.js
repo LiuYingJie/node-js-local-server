@@ -85,6 +85,12 @@
     return user.role !== 'admin';
   }
 
+  function canDelete(user) {
+    if (user.role === 'superadmin') return false;
+    if (currentUser.role === 'superadmin') return true;
+    return user.role !== 'admin';
+  }
+
   function renderPermissionSummary(user) {
     if (user.role === 'superadmin') return '<span class="permission-pill">全部</span>';
     if (user.role === 'admin') return '<span class="permission-pill">管理员默认</span>';
@@ -107,7 +113,9 @@
         <td>
           <div class="row-actions">
             <button type="button" class="btn btn-secondary btn-sm" data-action="edit" data-id="${user.id}" ${canEdit(user) ? '' : 'disabled'}>编辑</button>
-            <button type="button" class="btn btn-danger btn-sm" data-action="delete" data-id="${user.id}" ${canEdit(user) ? '' : 'disabled'}>删除</button>
+            ${canDelete(user)
+              ? `<button type="button" class="btn btn-danger btn-sm" data-action="delete" data-id="${user.id}">删除</button>`
+              : '<span class="text-muted">不可删除</span>'}
           </div>
         </td>
       </tr>
