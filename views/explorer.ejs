@@ -97,33 +97,6 @@
       </div>
     </div>
 
-    <!-- 发布版本弹窗 -->
-    <div class="modal" id="release-modal" style="display:none">
-      <div class="modal-backdrop"></div>
-      <div class="modal-box">
-        <h3>设为软件发布版本</h3>
-        <p class="modal-file" id="release-file-name"></p>
-        <form id="release-form">
-          <input type="hidden" id="release-file-id">
-          <div class="form-group">
-            <label>版本号</label>
-            <input type="text" id="release-version" required placeholder="1.0.0">
-          </div>
-          <div class="form-group">
-            <label>更新说明</label>
-            <textarea id="release-desc"></textarea>
-          </div>
-          <div class="form-group form-check">
-            <input type="checkbox" id="release-force">
-            <label for="release-force" style="margin:0">强制更新</label>
-          </div>
-          <div class="modal-actions">
-            <button type="button" class="btn btn-secondary modal-close">取消</button>
-            <button type="submit" class="btn btn-primary">确认</button>
-          </div>
-        </form>
-      </div>
-    </div>
     <!-- 移动到弹窗 -->
     <div class="modal" id="move-modal" style="display:none">
       <div class="modal-backdrop"></div>
@@ -131,8 +104,10 @@
         <h3>移动到</h3>
         <p class="modal-file" id="move-hint"></p>
         <div class="folder-picker" id="folder-picker"></div>
+        <p class="move-target-hint" id="move-target-hint">请选择目标文件夹</p>
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary modal-close">取消</button>
+          <button type="button" class="btn btn-primary" id="btn-confirm-move" disabled>确认移动</button>
         </div>
       </div>
     </div>

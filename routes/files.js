@@ -10,7 +10,6 @@ const { listEntries } = require('../lib/entryService');
 const { uploadFile, renameFile, moveFile, deleteFile } = require('../lib/fileService');
 const { createFolder, renameFolder, moveFolder, deleteFolder, normalizeFolderId, findFolderByPath } = require('../lib/folderService');
 const { listAllFoldersFlat } = require('../lib/storagePath');
-const { getVersionInfo, getReleaseConfig, setRelease, clearRelease } = require('../lib/releaseService');
 
 const router = express.Router();
 
@@ -260,8 +259,6 @@ router.patch('/api/files/:id', requireAuth, express.json(), async (req, res, nex
 /** DELETE /api/files/:id */
 router.delete('/api/files/:id', requireAuth, async (req, res, next) => {
   try {
-    const release = await getReleaseConfig();
-    if (release?.fileId === req.params.id) await clearRelease();
     const file = await deleteFile(req.params.id);
     await writeAudit(req, 'file.delete', {
       folderId: file.folderId,
@@ -272,43 +269,6 @@ router.delete('/api/files/:id', requireAuth, async (req, res, next) => {
     res.json({ success: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
-  }
-});
-
-/** POST /api/release - 设为发布版本 */
-router.post('/api/release', requireAuth, express.json(), async (req, res, next) => {
-  try {
-    const { fileId, version, desc, force } = req.body;
-    if (!fileId || !version?.trim()) {
-      return res.status(400).json({ error: '请选择文件并填写版本号' });
-    }
-    await setRelease({
-      fileId,
-      version: String(version).trim(),
-      desc: (desc || '').trim(),
-      force: Boolean(force),
-    });
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const versionInfo = await getVersionInfo(baseUrl);
-    await writeAudit(req, 'release.set', {
-      targetType: 'file',
-      targetId: fileId,
-      targetName: version,
-    });
-    res.json({ success: true, versionInfo });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-/** DELETE /api/release */
-router.delete('/api/release', requireAuth, async (req, res, next) => {
-  try {
-    await clearRelease();
-    await writeAudit(req, 'release.clear', { targetType: 'release' });
-    res.json({ success: true });
-  } catch (err) {
-    next(err);
   }
 });
 

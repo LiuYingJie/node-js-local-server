@@ -2,7 +2,6 @@ const express = require('express');
 const fs = require('fs');
 const fsPromises = require('fs/promises');
 const { getFileById, getFileByRelativePath, getFilePath } = require('../lib/fileService');
-const { getVersionInfo, getReleaseFile } = require('../lib/releaseService');
 const { sendFileDownload } = require('../lib/downloadHelper');
 const { requireLogin } = require('../middleware/auth');
 const { canAccessFolder } = require('../lib/permissionService');
@@ -19,18 +18,6 @@ function getPreviewType(fileName) {
   if (ext === 'json') return 'json';
   return null;
 }
-
-router.get('/version.json', async (req, res, next) => {
-  try {
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const info = await getVersionInfo(baseUrl);
-    if (!info) return res.status(404).json({ error: '暂未设置发布版本' });
-    const { fileId, ...publicInfo } = info;
-    res.json(publicInfo);
-  } catch (err) {
-    next(err);
-  }
-});
 
 router.get('/preview/:id', async (req, res, next) => {
   try {
@@ -114,14 +101,6 @@ async function sendFileRecord(file, res, next) {
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: '文件不存在' });
   return sendFileDownload(res, filePath, file.fileName, file.size, next);
 }
-
-router.get('/download/latest', async (req, res, next) => {
-  try {
-    await sendFileRecord(await getReleaseFile(), res, next);
-  } catch (err) {
-    next(err);
-  }
-});
 
 router.get(/^\/download\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i, async (req, res, next) => {
   try {

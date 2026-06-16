@@ -15,6 +15,8 @@
     lastClickedIndex: -1,
     filtered: null,
     user: null,
+    moveTargetFolderId: null,
+    moveTargetPath: '',
   };
 
   const els = {
@@ -37,8 +39,9 @@
     searchInput: document.getElementById('search-input'),
     loginModal: document.getElementById('login-modal'),
     renameModal: document.getElementById('rename-modal'),
-    releaseModal: document.getElementById('release-modal'),
     moveModal: document.getElementById('move-modal'),
+    moveTargetHint: document.getElementById('move-target-hint'),
+    btnConfirmMove: document.getElementById('btn-confirm-move'),
     linkModal: document.getElementById('link-modal'),
     linkFileName: document.getElementById('link-file-name'),
     downloadLinkInput: document.getElementById('download-link-input'),
@@ -350,9 +353,6 @@
       if (selected.length === 1) {
         items.push({ label: '重命名', action: () => openRename(single) });
       }
-      if (single?.type === 'file') {
-        items.push({ label: '设为发布版本', action: () => openRelease(single) });
-      }
       items.push({ label: '移动到...', action: () => openMoveModal(selected) });
       items.push({ label: '删除', action: () => deleteSelected(), danger: true });
     }
@@ -445,19 +445,14 @@
     document.getElementById('rename-value').select();
   }
 
-  function openRelease(entry) {
-    document.getElementById('release-file-id').value = entry.id;
-    document.getElementById('release-file-name').textContent = entry.name;
-    document.getElementById('release-version').value = '';
-    document.getElementById('release-desc').value = '';
-    document.getElementById('release-force').checked = false;
-    els.releaseModal.style.display = 'flex';
-  }
-
   async function openMoveModal(entries) {
     if (!state.isAdmin || !entries.length) return;
+    state.moveTargetFolderId = null;
+    state.moveTargetPath = '';
+    els.btnConfirmMove.disabled = true;
+    els.moveTargetHint.textContent = '请选择目标文件夹';
     document.getElementById('move-hint').textContent = `移动 ${entries.length} 项`;
-    els.folderPicker.innerHTML = '<div class="folder-picker-item disabled">加载中...</div>';
+    els.folderPicker.innerHTML = '<div class="folder-tree-empty">加载中...</div>';
     els.moveModal.style.display = 'flex';
 
     try {
@@ -467,23 +462,77 @@
         folders.filter((f) => selectedFolderIds.has(f.id)).map((f) => f.path)
       );
 
-      const allTargets = [{ id: null, path: '根目录', name: '根目录' }, ...folders];
-      els.folderPicker.innerHTML = allTargets.map((folder) => {
-        const disabled = folder.id === state.folderId || isInvalidMoveTarget(folder, selectedFolderIds, selectedFolderPaths);
-        return `<div class="folder-picker-item${disabled ? ' disabled' : ''}" data-folder-id="${folder.id ?? ''}">
-          ${escapeHtml(folder.path || folder.name)}
-        </div>`;
-      }).join('');
-
-      els.folderPicker.querySelectorAll('.folder-picker-item:not(.disabled)').forEach((item) => {
-        item.addEventListener('click', async () => {
-          const targetFolderId = item.dataset.folderId || null;
-          await moveSelectedTo(targetFolderId);
-        });
-      });
+      renderMoveTree(folders, selectedFolderIds, selectedFolderPaths);
     } catch (err) {
-      els.folderPicker.innerHTML = `<div class="folder-picker-item disabled">${escapeHtml(err.message)}</div>`;
+      els.folderPicker.innerHTML = `<div class="folder-tree-empty">${escapeHtml(err.message)}</div>`;
     }
+  }
+
+  function renderMoveTree(folders, selectedFolderIds, selectedFolderPaths) {
+    const childrenByParent = new Map();
+    folders.forEach((folder) => {
+      const parentId = folder.parentId || '';
+      if (!childrenByParent.has(parentId)) childrenByParent.set(parentId, []);
+      childrenByParent.get(parentId).push(folder);
+    });
+    childrenByParent.forEach((items) => items.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN')));
+
+    const expanded = new Set(['root']);
+    if (state.folderId) {
+      let current = folders.find((folder) => folder.id === state.folderId);
+      while (current) {
+        expanded.add(current.id);
+        current = folders.find((folder) => folder.id === current.parentId);
+      }
+    }
+
+    const renderNode = (folder, depth) => {
+      const id = folder?.id || null;
+      const nodeKey = id || 'root';
+      const children = childrenByParent.get(id || '') || [];
+      const disabled = id === state.folderId || isInvalidMoveTarget(folder || { id: null }, selectedFolderIds, selectedFolderPaths);
+      const opened = expanded.has(nodeKey);
+      const toggle = children.length ? `<button type="button" class="folder-tree-toggle" data-toggle-id="${escapeHtml(nodeKey)}">${opened ? '▾' : '▸'}</button>` : '<span class="folder-tree-toggle empty"></span>';
+      const name = folder ? folder.name : '根目录';
+      const row = `<div class="folder-tree-row${disabled ? ' disabled' : ''}" data-folder-id="${id ?? ''}" style="--depth:${depth}">
+        ${toggle}
+        <button type="button" class="folder-tree-name" data-folder-path="${escapeHtml(folder?.path || '根目录')}" ${disabled ? 'disabled' : ''}>${escapeHtml(name)}</button>
+      </div>`;
+      const childHtml = children.map((child) => renderNode(child, depth + 1)).join('');
+      return row + `<div class="folder-tree-children" data-parent-id="${escapeHtml(nodeKey)}" style="display:${opened ? 'block' : 'none'}">${childHtml}</div>`;
+    };
+
+    els.folderPicker.innerHTML = `<div class="folder-tree">${renderNode(null, 0)}</div>`;
+
+    els.folderPicker.querySelectorAll('.folder-tree-toggle:not(.empty)').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.toggleId;
+        const children = Array.from(els.folderPicker.querySelectorAll('.folder-tree-children'))
+          .find((item) => item.dataset.parentId === id);
+        const isOpen = children?.style.display !== 'none';
+        if (children) children.style.display = isOpen ? 'none' : 'block';
+        btn.textContent = isOpen ? '▸' : '▾';
+      });
+    });
+
+    els.folderPicker.querySelectorAll('.folder-tree-row:not(.disabled) .folder-tree-name').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const row = btn.closest('.folder-tree-row');
+        const targetFolderId = row.dataset.folderId || null;
+        selectMoveTarget(row, targetFolderId, btn.dataset.folderPath || '根目录');
+      });
+    });
+  }
+
+  function selectMoveTarget(row, folderId, folderPath) {
+    els.folderPicker.querySelectorAll('.folder-tree-row').forEach((item) => {
+      item.classList.toggle('selected-target', item === row);
+    });
+    state.moveTargetFolderId = folderId;
+    state.moveTargetPath = folderPath;
+    els.moveTargetHint.textContent = `目标目录: ${folderPath}`;
+    els.btnConfirmMove.disabled = false;
   }
 
   function isInvalidMoveTarget(folder, selectedFolderIds, selectedFolderPaths) {
@@ -741,6 +790,10 @@
   });
 
   els.btnCopyDownloadLink.addEventListener('click', copyDownloadLink);
+  els.btnConfirmMove.addEventListener('click', () => {
+    if (els.btnConfirmMove.disabled) return;
+    moveSelectedTo(state.moveTargetFolderId);
+  });
 
   document.getElementById('rename-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -755,25 +808,6 @@
       }
       els.renameModal.style.display = 'none';
       loadEntries(state.folderId);
-    } catch (err) {
-      alert(err.message);
-    }
-  });
-
-  document.getElementById('release-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    try {
-      await api('/api/release', {
-        method: 'POST',
-        body: JSON.stringify({
-          fileId: document.getElementById('release-file-id').value,
-          version: document.getElementById('release-version').value.trim(),
-          desc: document.getElementById('release-desc').value.trim(),
-          force: document.getElementById('release-force').checked,
-        }),
-      });
-      els.releaseModal.style.display = 'none';
-      setStatus('发布版本已设置');
     } catch (err) {
       alert(err.message);
     }

@@ -25,8 +25,6 @@ async function bootstrap() {
 
   // 迁移旧版数据
   await migrateLegacyData();
-  const { getVersionInfo } = require('./lib/releaseService');
-  await getVersionInfo('http://localhost');
 
   const app = express();
 
@@ -79,7 +77,6 @@ async function bootstrap() {
     console.log(`  局域网访问: http://<本机IP>:${port}`);
     console.log(`  文件管理:   http://127.0.0.1:${port}`);
     console.log(`  登录入口:   http://127.0.0.1:${port}/login`);
-    console.log(`  更新接口:   http://127.0.0.1:${port}/version.json`);
     console.log('========================================');
   });
 }

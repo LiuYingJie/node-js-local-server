@@ -16,8 +16,9 @@
     "size": 28,
     "desc": "test upload",
     "uploadTime": "2026-06-16 14:40:35",
-    "folderId": null,
-    "relativePath": "test-upload.txt"
+    "folderId": "8bccf727-f818-4a6e-a59e-3a510d85d61c",
+    "relativePath": "111/222/test-upload.txt",
+    "updateTime": "2026-06-16 16:49:17"
   },
   {
     "id": "a4e55b22-1627-4275-b866-a26a2a8645e5",
@@ -27,6 +28,7 @@
     "md5": "406121b23b43621a0770205b90431036",
     "size": 7488,
     "desc": "",
-    "uploadTime": "2026-06-16 15:56:42"
+    "uploadTime": "2026-06-16 15:56:42",
+    "updateTime": "2026-06-16 17:02:32"
   }
 ]
