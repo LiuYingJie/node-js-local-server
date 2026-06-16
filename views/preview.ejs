@@ -24,12 +24,18 @@
           <button type="button" class="tb-btn" id="preview-search-prev" title="上一个">↑</button>
           <button type="button" class="tb-btn" id="preview-search-next" title="下一个">↓</button>
         </div>
+        <% if (canEdit) { %>
+          <button type="button" class="tb-btn" id="btn-edit">编辑</button>
+          <button type="button" class="tb-btn primary" id="btn-save" style="display:none">保存</button>
+          <button type="button" class="tb-btn" id="btn-cancel-edit" style="display:none">取消</button>
+        <% } %>
         <a class="tb-btn" href="/download/<%= file.id %>">下载</a>
       </div>
     </header>
 
     <main class="preview-main">
       <div class="preview-error" id="preview-error" style="display:none"></div>
+      <textarea class="preview-editor" id="preview-editor" spellcheck="false" style="display:none"></textarea>
       <div class="preview-content" id="preview-content"></div>
     </main>
   </div>
@@ -37,8 +43,10 @@
   <script>
     window.PREVIEW_DATA = <%- JSON.stringify({
       type: previewType,
+      fileId: file.id,
       fileName: file.fileName,
       content,
+      canEdit,
       maxSizeMB,
     }).replace(/</g, '\\u003c') %>;
   </script>

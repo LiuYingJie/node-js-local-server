@@ -7,12 +7,18 @@
     searchCount: document.getElementById('preview-search-count'),
     prev: document.getElementById('preview-search-prev'),
     next: document.getElementById('preview-search-next'),
+    editor: document.getElementById('preview-editor'),
+    btnEdit: document.getElementById('btn-edit'),
+    btnSave: document.getElementById('btn-save'),
+    btnCancelEdit: document.getElementById('btn-cancel-edit'),
   };
 
   const state = {
     query: '',
     hits: [],
     activeIndex: -1,
+    editing: false,
+    savedContent: String(data.content || ''),
   };
 
   function escapeHtml(value) {
@@ -128,6 +134,49 @@
     collectHits();
   }
 
+  function setStatus(message, danger) {
+    els.error.textContent = message;
+    els.error.style.display = message ? 'block' : 'none';
+    els.error.classList.toggle('danger', Boolean(danger));
+  }
+
+  function setEditing(editing) {
+    if (!data.canEdit) return;
+    state.editing = editing;
+    els.editor.style.display = editing ? 'block' : 'none';
+    els.content.style.display = editing ? 'none' : 'block';
+    els.btnEdit.style.display = editing ? 'none' : 'inline-flex';
+    els.btnSave.style.display = editing ? 'inline-flex' : 'none';
+    els.btnCancelEdit.style.display = editing ? 'inline-flex' : 'none';
+    document.getElementById('preview-search').style.display = editing ? 'none' : 'flex';
+    if (editing) {
+      els.editor.value = state.savedContent;
+      els.editor.focus();
+    }
+  }
+
+  async function saveContent() {
+    if (!state.editing) return;
+    const content = els.editor.value;
+    try {
+      const res = await fetch('/api/files/' + encodeURIComponent(data.fileId) + '/content', {
+        method: 'PUT',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(result.error || '保存失败');
+      data.content = result.content;
+      state.savedContent = result.content;
+      setEditing(false);
+      render();
+      setStatus('已保存');
+      setTimeout(() => setStatus(''), 1600);
+    } catch (err) {
+      setStatus(err.message, true);
+    }
+  }
+
   function collectHits() {
     state.hits = Array.from(els.content.querySelectorAll('mark.search-hit'));
     if (!state.hits.length) {
@@ -178,9 +227,22 @@
 
   els.prev.addEventListener('click', () => moveHit(-1));
   els.next.addEventListener('click', () => moveHit(1));
+  els.btnEdit?.addEventListener('click', () => setEditing(true));
+  els.btnCancelEdit?.addEventListener('click', () => {
+    if (els.editor.value !== state.savedContent && !confirm('放弃未保存的修改？')) return;
+    setEditing(false);
+    setStatus('');
+  });
+  els.btnSave?.addEventListener('click', () => saveContent());
 
   document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      if (state.editing) saveContent();
+      return;
+    }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+      if (state.editing) return;
       e.preventDefault();
       els.searchInput.focus();
       els.searchInput.select();

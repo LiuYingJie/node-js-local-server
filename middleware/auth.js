@@ -22,6 +22,14 @@ function requireAuth(req, res, next) {
   return res.redirect('/login');
 }
 
+function requireLogin(req, res, next) {
+  if (currentUser(req)) return next();
+  if (req.xhr || req.headers.accept?.includes('application/json')) {
+    return res.status(401).json({ error: '未登录，请先登录' });
+  }
+  return res.redirect('/login');
+}
+
 function requireSuperAdmin(req, res, next) {
   if (isSuperAdmin(req)) return next();
   if (req.xhr || req.headers.accept?.includes('application/json')) {
@@ -30,4 +38,4 @@ function requireSuperAdmin(req, res, next) {
   return res.status(403).send('需要超管权限');
 }
 
-module.exports = { isAdmin, isSuperAdmin, currentUser, requireAuth, requireSuperAdmin };
+module.exports = { isAdmin, isSuperAdmin, currentUser, requireLogin, requireAuth, requireSuperAdmin };

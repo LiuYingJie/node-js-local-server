@@ -7,7 +7,7 @@
     "enabled": true,
     "permissions": [],
     "createTime": "2026-06-16 15:36:01",
-    "updateTime": "2026-06-16 15:51:00",
+    "updateTime": "2026-06-16 16:02:58",
     "remark": "系统超管"
   },
   {
@@ -19,5 +19,24 @@
     "permissions": [],
     "createTime": "2026-06-16 15:38:51",
     "updateTime": "2026-06-16 15:38:51"
+  },
+  {
+    "id": "b389e14a-cd81-47f9-b0df-6cbca10c9229",
+    "username": "ak_JozREKZkXCUVYCsZ",
+    "passwordHash": "pbkdf2$120000$d5160e65a4eb22aa8d18a6fe8dade8e2$5da7c4c217efc84cb2aed2bc24419f9035da91d23830d26dd44824f2fb33a2ec",
+    "role": "user",
+    "enabled": true,
+    "remark": "快速生成用户",
+    "permissions": [
+      {
+        "path": "/",
+        "actions": [
+          "read"
+        ],
+        "recursive": true
+      }
+    ],
+    "createTime": "2026-06-16 15:55:22",
+    "updateTime": "2026-06-16 15:55:22"
   }
 ]

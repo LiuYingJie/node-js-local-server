@@ -136,6 +136,21 @@
         </div>
       </div>
     </div>
+    <!-- 下载链接弹窗 -->
+    <div class="modal" id="link-modal" style="display:none">
+      <div class="modal-backdrop"></div>
+      <div class="modal-box">
+        <h3>下载链接</h3>
+        <p class="modal-file" id="link-file-name"></p>
+        <div class="link-box">
+          <input type="text" id="download-link-input" readonly>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary modal-close">关闭</button>
+          <button type="button" class="btn btn-primary" id="btn-copy-download-link">复制链接</button>
+        </div>
+      </div>
+    </div>
   </div>
   <script>
     window.EXPLORER_CONFIG = { maxUploadSizeMB: <%= maxUploadSizeMB %> };

@@ -39,6 +39,10 @@
     renameModal: document.getElementById('rename-modal'),
     releaseModal: document.getElementById('release-modal'),
     moveModal: document.getElementById('move-modal'),
+    linkModal: document.getElementById('link-modal'),
+    linkFileName: document.getElementById('link-file-name'),
+    downloadLinkInput: document.getElementById('download-link-input'),
+    btnCopyDownloadLink: document.getElementById('btn-copy-download-link'),
     folderPicker: document.getElementById('folder-picker'),
   };
 
@@ -337,10 +341,7 @@
       items.push({ label: '打开', action: () => openPreview(single.id) });
     }
     if (single?.type === 'file') {
-      items.push({ label: '复制下载链接', action: () => {
-        navigator.clipboard.writeText(location.origin + '/download/' + single.id);
-        setStatus('链接已复制');
-      }});
+      items.push({ label: '查看下载链接', action: () => openDownloadLink(single) });
     }
 
     if (state.isAdmin) {
@@ -389,6 +390,29 @@
     showContextMenu([
       { label: '创建文件夹', action: () => els.btnNewFolder.click() },
     ], e.clientX, e.clientY);
+  }
+
+  function getDownloadUrl(entry) {
+    return location.origin + '/download/' + entry.id;
+  }
+
+  function openDownloadLink(entry) {
+    els.linkFileName.textContent = entry.name;
+    els.downloadLinkInput.value = getDownloadUrl(entry);
+    els.linkModal.style.display = 'flex';
+    els.downloadLinkInput.focus();
+    els.downloadLinkInput.select();
+  }
+
+  async function copyDownloadLink() {
+    const link = els.downloadLinkInput.value;
+    try {
+      await navigator.clipboard.writeText(link);
+    } catch {
+      els.downloadLinkInput.select();
+      document.execCommand('copy');
+    }
+    setStatus('链接已复制');
   }
 
   async function deleteSelected() {
@@ -712,6 +736,8 @@
   document.querySelectorAll('.modal-close').forEach((btn) => {
     btn.addEventListener('click', () => btn.closest('.modal').style.display = 'none');
   });
+
+  els.btnCopyDownloadLink.addEventListener('click', copyDownloadLink);
 
   document.getElementById('rename-form').addEventListener('submit', async (e) => {
     e.preventDefault();

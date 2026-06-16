@@ -44,6 +44,12 @@
   text-decoration: none;
 }
 
+.tb-btn.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
 .preview-title {
   min-width: 0;
 }
@@ -104,11 +110,37 @@
   font-size: 0.88rem;
 }
 
+.preview-error.danger {
+  border-color: rgba(239, 68, 68, 0.35);
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.12);
+}
+
 .preview-content {
   font-family: Consolas, Monaco, 'Courier New', monospace;
   font-size: 13px;
   line-height: 1.55;
   color: var(--text);
+}
+
+.preview-editor {
+  width: calc(100% - 32px);
+  height: calc(100vh - 108px);
+  margin: 0 16px;
+  padding: 12px 14px;
+  resize: none;
+  background: #0b1117;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: Consolas, Monaco, 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  outline: none;
+}
+
+.preview-editor:focus {
+  border-color: var(--primary);
 }
 
 .text-line {
