@@ -6,6 +6,7 @@ pnpm-debug.log*
 *.log
 logs/
 data/*.log
+data/users.json
 storage/temp/
 storage/files/*
 !storage/files/.gitkeep
