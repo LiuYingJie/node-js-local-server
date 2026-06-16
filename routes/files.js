@@ -4,10 +4,12 @@ const fs = require('fs/promises');
 const { loadConfig } = require('../lib/config');
 const { TEMP_DIR } = require('../lib/paths');
 const { ensureDir } = require('../lib/fileUtils');
-const { isAdmin, requireAuth } = require('../middleware/auth');
+const { isAdmin, currentUser, requireAuth } = require('../middleware/auth');
+const { writeAudit } = require('../lib/auditService');
 const { listEntries } = require('../lib/entryService');
 const { uploadFile, renameFile, moveFile, deleteFile } = require('../lib/fileService');
-const { createFolder, renameFolder, moveFolder, deleteFolder, normalizeFolderId } = require('../lib/folderService');
+const { createFolder, renameFolder, moveFolder, deleteFolder, normalizeFolderId, findFolderByPath } = require('../lib/folderService');
+const { listAllFoldersFlat } = require('../lib/storagePath');
 const { getVersionInfo, getReleaseConfig, setRelease, clearRelease } = require('../lib/releaseService');
 
 const router = express.Router();
@@ -37,6 +39,7 @@ router.get('/api/session', (req, res) => {
   const config = loadConfig();
   res.json({
     isAdmin: isAdmin(req),
+    user: currentUser(req),
     maxUploadSizeMB: config.maxUploadSizeMB || 2048,
   });
 });
@@ -83,6 +86,12 @@ router.post('/api/upload', requireAuth, (req, res, next) => {
           folderId,
         });
         results.push(record);
+        await writeAudit(req, 'file.upload', {
+          folderId,
+          targetType: 'file',
+          targetId: record.id,
+          targetName: record.fileName,
+        });
       } catch (e) {
         errors.push({ name: file.originalname, error: e.message });
       } finally {
@@ -98,10 +107,78 @@ router.post('/api/upload', requireAuth, (req, res, next) => {
   });
 });
 
+/** GET /api/folders/all - 全部文件夹（移动用） */
+router.get('/api/folders/all', requireAuth, async (req, res, next) => {
+  try {
+    const folders = await listAllFoldersFlat();
+    res.json(folders);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** GET /api/folders/resolve?path=父/子 - 根据路径定位文件夹 */
+router.get('/api/folders/resolve', async (req, res) => {
+  try {
+    const folder = await findFolderByPath(req.query.path || '');
+    if (folder === undefined) {
+      return res.status(404).json({ error: '目录不存在' });
+    }
+    res.json({ folderId: folder ? folder.id : null });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/** POST /api/move - 批量移动 */
+router.post('/api/move', requireAuth, express.json(), async (req, res, next) => {
+  try {
+    const { targetFolderId, items } = req.body;
+    if (!Array.isArray(items) || !items.length) {
+      return res.status(400).json({ error: '请选择要移动的项目' });
+    }
+    const targetId = normalizeFolderId(targetFolderId);
+    const moved = [];
+    for (const item of items) {
+      if (item.type === 'file') {
+        const file = await moveFile(item.id, targetId);
+        moved.push(file);
+        await writeAudit(req, 'file.move', {
+          folderId: file.folderId,
+          targetFolderId: targetId,
+          targetType: 'file',
+          targetId: file.id,
+          targetName: file.fileName,
+        });
+      } else if (item.type === 'folder') {
+        if (item.id === targetId) throw new Error('不能移动到自身');
+        const folder = await moveFolder(item.id, targetId);
+        moved.push(folder);
+        await writeAudit(req, 'folder.move', {
+          folderId: folder.parentId,
+          targetFolderId: targetId,
+          targetType: 'folder',
+          targetId: folder.id,
+          targetName: folder.name,
+        });
+      }
+    }
+    res.json({ success: true, moved });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 /** POST /api/folders - 新建文件夹 */
 router.post('/api/folders', requireAuth, express.json(), async (req, res, next) => {
   try {
     const folder = await createFolder(req.body.name, req.body.parentId);
+    await writeAudit(req, 'folder.create', {
+      folderId: folder.parentId,
+      targetType: 'folder',
+      targetId: folder.id,
+      targetName: folder.name,
+    });
     res.json({ success: true, folder });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -114,9 +191,22 @@ router.patch('/api/folders/:id', requireAuth, express.json(), async (req, res, n
     let folder;
     if (req.body.name != null) {
       folder = await renameFolder(req.params.id, req.body.name);
+      await writeAudit(req, 'folder.rename', {
+        folderId: folder.parentId,
+        targetType: 'folder',
+        targetId: folder.id,
+        targetName: folder.name,
+      });
     }
     if (req.body.parentId !== undefined) {
       folder = await moveFolder(req.params.id, req.body.parentId);
+      await writeAudit(req, 'folder.move', {
+        folderId: folder.parentId,
+        targetFolderId: folder.parentId,
+        targetType: 'folder',
+        targetId: folder.id,
+        targetName: folder.name,
+      });
     }
     res.json({ success: true, folder });
   } catch (err) {
@@ -128,6 +218,10 @@ router.patch('/api/folders/:id', requireAuth, express.json(), async (req, res, n
 router.delete('/api/folders/:id', requireAuth, async (req, res, next) => {
   try {
     await deleteFolder(req.params.id);
+    await writeAudit(req, 'folder.delete', {
+      targetType: 'folder',
+      targetId: req.params.id,
+    });
     res.json({ success: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -140,9 +234,22 @@ router.patch('/api/files/:id', requireAuth, express.json(), async (req, res, nex
     let file;
     if (req.body.fileName != null || req.body.desc != null) {
       file = await renameFile(req.params.id, req.body.fileName, req.body.desc);
+      await writeAudit(req, 'file.update', {
+        folderId: file.folderId,
+        targetType: 'file',
+        targetId: file.id,
+        targetName: file.fileName,
+      });
     }
     if (req.body.folderId !== undefined) {
       file = await moveFile(req.params.id, req.body.folderId);
+      await writeAudit(req, 'file.move', {
+        folderId: file.folderId,
+        targetFolderId: file.folderId,
+        targetType: 'file',
+        targetId: file.id,
+        targetName: file.fileName,
+      });
     }
     res.json({ success: true, file });
   } catch (err) {
@@ -155,7 +262,13 @@ router.delete('/api/files/:id', requireAuth, async (req, res, next) => {
   try {
     const release = await getReleaseConfig();
     if (release?.fileId === req.params.id) await clearRelease();
-    await deleteFile(req.params.id);
+    const file = await deleteFile(req.params.id);
+    await writeAudit(req, 'file.delete', {
+      folderId: file.folderId,
+      targetType: 'file',
+      targetId: file.id,
+      targetName: file.fileName,
+    });
     res.json({ success: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -177,6 +290,11 @@ router.post('/api/release', requireAuth, express.json(), async (req, res, next) 
     });
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const versionInfo = await getVersionInfo(baseUrl);
+    await writeAudit(req, 'release.set', {
+      targetType: 'file',
+      targetId: fileId,
+      targetName: version,
+    });
     res.json({ success: true, versionInfo });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -187,6 +305,7 @@ router.post('/api/release', requireAuth, express.json(), async (req, res, next) 
 router.delete('/api/release', requireAuth, async (req, res, next) => {
   try {
     await clearRelease();
+    await writeAudit(req, 'release.clear', { targetType: 'release' });
     res.json({ success: true });
   } catch (err) {
     next(err);

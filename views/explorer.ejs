@@ -13,7 +13,12 @@
       <div class="toolbar-left">
         <button type="button" class="tb-btn" id="btn-back" title="后退" disabled>←</button>
         <button type="button" class="tb-btn" id="btn-up" title="上级">↑</button>
-        <div class="breadcrumb" id="breadcrumb"></div>
+        <div class="path-bar" id="path-bar">
+          <div class="breadcrumb" id="breadcrumb" title="点击输入目录路径"></div>
+          <form class="path-form" id="path-form" style="display:none">
+            <input type="text" id="path-input" autocomplete="off" spellcheck="false" aria-label="目录路径">
+          </form>
+        </div>
       </div>
       <div class="toolbar-center">
         <div class="search-box">
@@ -24,6 +29,7 @@
         <button type="button" class="tb-btn view-btn active" data-view="grid" title="图标">▦</button>
         <button type="button" class="tb-btn view-btn" data-view="list" title="列表">☰</button>
         <button type="button" class="tb-btn admin-only" id="btn-new-folder" title="新建文件夹">+ 文件夹</button>
+        <a class="tb-btn admin-only" id="btn-admin" href="/admin" title="后台管理">后台</a>
         <span class="user-badge" id="user-badge">访客</span>
         <button type="button" class="tb-btn" id="btn-login">登录</button>
         <button type="button" class="tb-btn admin-only" id="btn-logout" style="display:none">退出</button>
@@ -33,6 +39,7 @@
     <main class="explorer-main" id="explorer-main">
       <div class="empty-hint" id="empty-hint" style="display:none">此文件夹为空</div>
       <div class="entry-grid" id="entry-container"></div>
+      <div class="selection-box" id="selection-box" style="display:none"></div>
     </main>
 
     <div class="status-bar">
@@ -117,8 +124,19 @@
         </form>
       </div>
     </div>
+    <!-- 移动到弹窗 -->
+    <div class="modal" id="move-modal" style="display:none">
+      <div class="modal-backdrop"></div>
+      <div class="modal-box">
+        <h3>移动到</h3>
+        <p class="modal-file" id="move-hint"></p>
+        <div class="folder-picker" id="folder-picker"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary modal-close">取消</button>
+        </div>
+      </div>
+    </div>
   </div>
-
   <script>
     window.EXPLORER_CONFIG = { maxUploadSizeMB: <%= maxUploadSizeMB %> };
   </script>

@@ -20,3 +20,4 @@ echo Run stop.bat first, then try again.
 pause
 
 :end
+pause

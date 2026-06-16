@@ -20,6 +20,14 @@
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.toolbar-left {
+  flex: 1 1 auto;
+  min-width: 240px;
+}
+
+.toolbar-right {
   flex-shrink: 0;
 }
 
@@ -63,13 +71,24 @@
   color: #fff;
 }
 
+.path-bar {
+  flex: 1;
+  min-width: 160px;
+  margin-left: 8px;
+}
+
 .breadcrumb {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-left: 8px;
+  min-height: 31px;
+  padding: 4px 8px;
+  background: var(--surface2);
+  border: 1px solid transparent;
+  border-radius: 6px;
   font-size: 0.9rem;
   overflow: hidden;
+  cursor: text;
 }
 
 .breadcrumb-item {
@@ -88,6 +107,25 @@
 .breadcrumb-sep {
   color: var(--text-muted);
   user-select: none;
+}
+
+.path-form {
+  width: 100%;
+}
+
+.path-form input {
+  width: 100%;
+  min-height: 31px;
+  padding: 5px 8px;
+  background: var(--surface2);
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.path-form input:focus {
+  outline: none;
 }
 
 .user-badge {
@@ -109,6 +147,15 @@
   padding: 16px;
   position: relative;
   user-select: none;
+}
+
+.selection-box {
+  position: absolute;
+  border: 1px solid var(--primary);
+  background: rgba(59, 130, 246, 0.12);
+  pointer-events: none;
+  z-index: 10;
+  display: none;
 }
 
 .entry-grid {
@@ -296,4 +343,32 @@ body:not(.is-admin) .admin-only {
   background: var(--primary);
   width: 0%;
   transition: width 0.15s;
+}
+
+.folder-picker {
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.folder-picker-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.folder-picker-item:last-child {
+  border-bottom: none;
+}
+
+.folder-picker-item:hover {
+  background: var(--surface2);
+}
+
+.folder-picker-item.disabled {
+  color: var(--text-muted);
+  pointer-events: none;
 }

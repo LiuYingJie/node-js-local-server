@@ -6,6 +6,7 @@ const { loadConfig } = require('./lib/config');
 const { ensureDir } = require('./lib/fileUtils');
 const { STORAGE_DIR, FILES_DIR, TEMP_DIR } = require('./lib/paths');
 const { migrateLegacyData } = require('./lib/fileService');
+const { ensureDefaultSuperAdmin } = require('./lib/userService');
 
 const indexRouter = require('./routes/index');
 const apiRouter = require('./routes/api');
@@ -20,6 +21,7 @@ async function bootstrap() {
   await ensureDir(FILES_DIR);
   await ensureDir(TEMP_DIR);
   await ensureDir(path.join(__dirname, 'data'));
+  await ensureDefaultSuperAdmin(config);
 
   // 迁移旧版数据
   await migrateLegacyData();
@@ -39,7 +41,7 @@ async function bootstrap() {
       secret: config.sessionSecret || 'local-file-server-secret',
       resave: false,
       saveUninitialized: false,
-      cookie: { maxAge: 24 * 60 * 60 * 1000, httpOnly: true },
+      cookie: { maxAge: 24 * 60 * 60 * 1000, httpOnly: true, sameSite: 'lax' },
     })
   );
 

@@ -14,15 +14,19 @@
     navIndex: 0,
     lastClickedIndex: -1,
     filtered: null,
+    user: null,
   };
 
   const els = {
     container: document.getElementById('entry-container'),
     breadcrumb: document.getElementById('breadcrumb'),
+    pathForm: document.getElementById('path-form'),
+    pathInput: document.getElementById('path-input'),
     emptyHint: document.getElementById('empty-hint'),
     statusText: document.getElementById('status-text'),
     selectionInfo: document.getElementById('selection-info'),
     contextMenu: document.getElementById('context-menu'),
+    selectionBox: document.getElementById('selection-box'),
     dropOverlay: document.getElementById('drop-overlay'),
     userBadge: document.getElementById('user-badge'),
     btnLogin: document.getElementById('btn-login'),
@@ -34,6 +38,8 @@
     loginModal: document.getElementById('login-modal'),
     renameModal: document.getElementById('rename-modal'),
     releaseModal: document.getElementById('release-modal'),
+    moveModal: document.getElementById('move-modal'),
+    folderPicker: document.getElementById('folder-picker'),
   };
 
   const FILE_ICONS = {
@@ -64,6 +70,10 @@
     return FILE_ICONS[getExt(entry.name)] || '📄';
   }
 
+  function isPreviewable(entry) {
+    return entry?.type === 'file' && ['txt', 'json'].includes(getExt(entry.name));
+  }
+
   function keyOf(entry) {
     return entry.type + ':' + entry.id;
   }
@@ -88,12 +98,27 @@
     els.selectionInfo.textContent = n ? `已选 ${n} 项` : '';
   }
 
+  function updateEntrySelectionClasses() {
+    els.container.querySelectorAll('.entry-item').forEach((item) => {
+      item.classList.toggle('selected', state.selected.has(item.dataset.key));
+    });
+  }
+
+  function rectsOverlap(a, b) {
+    return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+  }
+
   function applyAdminUI() {
+    const loggedIn = Boolean(state.user);
     document.body.classList.toggle('is-admin', state.isAdmin);
     els.userBadge.textContent = state.isAdmin ? '管理员' : '访客';
+    if (state.user) {
+      const roleText = state.user.role === 'superadmin' ? '超管' : (state.user.role === 'admin' ? '管理员' : '用户');
+      els.userBadge.textContent = `${state.user.username} · ${roleText}`;
+    }
     els.userBadge.classList.toggle('admin', state.isAdmin);
-    els.btnLogin.style.display = state.isAdmin ? 'none' : 'inline-block';
-    els.btnLogout.style.display = state.isAdmin ? 'inline-block' : 'none';
+    els.btnLogin.style.display = loggedIn ? 'none' : 'inline-block';
+    els.btnLogout.style.display = loggedIn ? 'inline-block' : 'none';
   }
 
   async function api(url, options = {}) {
@@ -109,6 +134,7 @@
   async function loadSession() {
     const data = await api('/api/session');
     state.isAdmin = data.isAdmin;
+    state.user = data.user || null;
     applyAdminUI();
   }
 
@@ -120,6 +146,7 @@
     state.files = data.files;
     state.breadcrumb = data.breadcrumb;
     state.isAdmin = data.isAdmin;
+    state.user = data.user || state.user;
     state.filtered = null;
     state.selected.clear();
     state.lastClickedIndex = -1;
@@ -154,12 +181,43 @@
     });
   }
 
+  function getCurrentPathText() {
+    const parts = state.breadcrumb.slice(1).map((crumb) => crumb.name);
+    return parts.length ? parts.join('/') : '/';
+  }
+
+  function showPathInput() {
+    els.pathInput.value = getCurrentPathText();
+    els.breadcrumb.style.display = 'none';
+    els.pathForm.style.display = 'block';
+    els.pathInput.focus();
+    els.pathInput.select();
+  }
+
+  function hidePathInput() {
+    els.pathForm.style.display = 'none';
+    els.breadcrumb.style.display = 'flex';
+  }
+
+  async function navigateByPath(pathText) {
+    try {
+      const data = await api('/api/folders/resolve?path=' + encodeURIComponent(pathText));
+      hidePathInput();
+      navigate(data.folderId);
+    } catch (err) {
+      setStatus(err.message);
+      els.pathInput.focus();
+      els.pathInput.select();
+    }
+  }
+
   function escapeHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   function render() {
     renderBreadcrumb();
+    hidePathInput();
     els.container.className = 'entry-grid' + (state.viewMode === 'list' ? ' view-list' : '');
     document.querySelectorAll('.view-btn').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.view === state.viewMode);
@@ -222,8 +280,14 @@
     if (el.dataset.type === 'folder') {
       navigate(el.dataset.id);
     } else {
-      downloadFile(el.dataset.id);
+      const entry = getSelectedEntries()[0] || getAllEntries().find((item) => item.type === 'file' && item.id === el.dataset.id);
+      if (isPreviewable(entry)) openPreview(el.dataset.id);
+      else downloadFile(el.dataset.id);
     }
+  }
+
+  function openPreview(id) {
+    window.open('/preview/' + id, '_blank');
   }
 
   function downloadFile(id) {
@@ -269,6 +333,9 @@
     if (single?.type === 'folder') {
       items.push({ label: '打开', action: () => navigate(single.id) });
     }
+    if (isPreviewable(single)) {
+      items.push({ label: '打开', action: () => openPreview(single.id) });
+    }
     if (single?.type === 'file') {
       items.push({ label: '复制下载链接', action: () => {
         navigator.clipboard.writeText(location.origin + '/download/' + single.id);
@@ -284,9 +351,14 @@
       if (single?.type === 'file') {
         items.push({ label: '设为发布版本', action: () => openRelease(single) });
       }
+      items.push({ label: '移动到...', action: () => openMoveModal(selected) });
       items.push({ label: '删除', action: () => deleteSelected(), danger: true });
     }
 
+    showContextMenu(items, e.clientX, e.clientY);
+  }
+
+  function showContextMenu(items, clientX, clientY) {
     if (!items.length) return;
 
     els.contextMenu.innerHTML = items.map((item) => {
@@ -302,10 +374,21 @@
       menuItems[idx++].addEventListener('click', () => { hideContextMenu(); item.action(); });
     });
 
-    const x = Math.min(e.clientX, window.innerWidth - 180);
-    const y = Math.min(e.clientY, window.innerHeight - items.length * 36);
+    const x = Math.min(clientX, window.innerWidth - 180);
+    const y = Math.min(clientY, window.innerHeight - items.length * 36);
     els.contextMenu.style.left = x + 'px';
     els.contextMenu.style.top = y + 'px';
+  }
+
+  function onBlankContextMenu(e) {
+    if (e.target.closest('.entry-item')) return;
+    e.preventDefault();
+    state.selected.clear();
+    render();
+    if (!state.isAdmin) return;
+    showContextMenu([
+      { label: '创建文件夹', action: () => els.btnNewFolder.click() },
+    ], e.clientX, e.clientY);
   }
 
   async function deleteSelected() {
@@ -342,6 +425,67 @@
     document.getElementById('release-desc').value = '';
     document.getElementById('release-force').checked = false;
     els.releaseModal.style.display = 'flex';
+  }
+
+  async function openMoveModal(entries) {
+    if (!state.isAdmin || !entries.length) return;
+    document.getElementById('move-hint').textContent = `移动 ${entries.length} 项`;
+    els.folderPicker.innerHTML = '<div class="folder-picker-item disabled">加载中...</div>';
+    els.moveModal.style.display = 'flex';
+
+    try {
+      const folders = await api('/api/folders/all');
+      const selectedFolderIds = new Set(entries.filter((e) => e.type === 'folder').map((e) => e.id));
+      const selectedFolderPaths = new Set(
+        folders.filter((f) => selectedFolderIds.has(f.id)).map((f) => f.path)
+      );
+
+      const allTargets = [{ id: null, path: '根目录', name: '根目录' }, ...folders];
+      els.folderPicker.innerHTML = allTargets.map((folder) => {
+        const disabled = folder.id === state.folderId || isInvalidMoveTarget(folder, selectedFolderIds, selectedFolderPaths);
+        return `<div class="folder-picker-item${disabled ? ' disabled' : ''}" data-folder-id="${folder.id ?? ''}">
+          ${escapeHtml(folder.path || folder.name)}
+        </div>`;
+      }).join('');
+
+      els.folderPicker.querySelectorAll('.folder-picker-item:not(.disabled)').forEach((item) => {
+        item.addEventListener('click', async () => {
+          const targetFolderId = item.dataset.folderId || null;
+          await moveSelectedTo(targetFolderId);
+        });
+      });
+    } catch (err) {
+      els.folderPicker.innerHTML = `<div class="folder-picker-item disabled">${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  function isInvalidMoveTarget(folder, selectedFolderIds, selectedFolderPaths) {
+    if (!folder.id) return false;
+    if (selectedFolderIds.has(folder.id)) return true;
+    for (const selectedPath of selectedFolderPaths) {
+      if (folder.path && selectedPath && folder.path.startsWith(selectedPath + '/')) return true;
+    }
+    return false;
+  }
+
+  async function moveSelectedTo(targetFolderId) {
+    const selected = getSelectedEntries();
+    if (!selected.length) return;
+    try {
+      await api('/api/move', {
+        method: 'POST',
+        body: JSON.stringify({
+          targetFolderId,
+          items: selected.map((entry) => ({ type: entry.type, id: entry.id })),
+        }),
+      });
+      els.moveModal.style.display = 'none';
+      state.selected.clear();
+      loadEntries(state.folderId);
+      setStatus(`已移动 ${selected.length} 项`);
+    } catch (err) {
+      alert(err.message);
+    }
   }
 
   async function uploadFiles(fileList) {
@@ -384,15 +528,115 @@
   }
 
   // ---- 事件绑定 ----
+  let dragSelect = null;
+
   document.addEventListener('click', (e) => {
     if (!els.contextMenu.contains(e.target)) hideContextMenu();
   });
 
+  els.breadcrumb.addEventListener('click', (e) => {
+    if (e.target.closest('.breadcrumb-item')) return;
+    showPathInput();
+  });
+
+  els.breadcrumb.addEventListener('dblclick', showPathInput);
+
+  els.pathForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    navigateByPath(els.pathInput.value);
+  });
+
+  els.pathInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      hidePathInput();
+    }
+  });
+
+  els.pathInput.addEventListener('blur', () => {
+    setTimeout(() => {
+      if (document.activeElement !== els.pathInput) hidePathInput();
+    }, 120);
+  });
+
+  document.getElementById('explorer-main').addEventListener('contextmenu', onBlankContextMenu);
+
+  document.getElementById('explorer-main').addEventListener('mousedown', (e) => {
+    if (e.button !== 0 || e.target.closest('.entry-item')) return;
+    const main = e.currentTarget;
+    const rect = main.getBoundingClientRect();
+    dragSelect = {
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startX: e.clientX - rect.left + main.scrollLeft,
+      startY: e.clientY - rect.top + main.scrollTop,
+      active: false,
+      additive: e.ctrlKey || e.metaKey,
+      baseSelection: new Set(state.selected),
+    };
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!dragSelect) return;
+    const main = document.getElementById('explorer-main');
+    const rect = main.getBoundingClientRect();
+    const dx = Math.abs(e.clientX - dragSelect.startClientX);
+    const dy = Math.abs(e.clientY - dragSelect.startClientY);
+    if (!dragSelect.active && dx < 4 && dy < 4) return;
+
+    dragSelect.active = true;
+    const currentX = e.clientX - rect.left + main.scrollLeft;
+    const currentY = e.clientY - rect.top + main.scrollTop;
+    const left = Math.min(dragSelect.startX, currentX);
+    const top = Math.min(dragSelect.startY, currentY);
+    const width = Math.abs(currentX - dragSelect.startX);
+    const height = Math.abs(currentY - dragSelect.startY);
+
+    els.selectionBox.style.display = 'block';
+    els.selectionBox.style.left = left + 'px';
+    els.selectionBox.style.top = top + 'px';
+    els.selectionBox.style.width = width + 'px';
+    els.selectionBox.style.height = height + 'px';
+
+    const selectRect = {
+      left: Math.min(dragSelect.startClientX, e.clientX),
+      right: Math.max(dragSelect.startClientX, e.clientX),
+      top: Math.min(dragSelect.startClientY, e.clientY),
+      bottom: Math.max(dragSelect.startClientY, e.clientY),
+    };
+
+    const next = dragSelect.additive ? new Set(dragSelect.baseSelection) : new Set();
+    els.container.querySelectorAll('.entry-item').forEach((item) => {
+      const itemRect = item.getBoundingClientRect();
+      if (rectsOverlap(selectRect, itemRect)) next.add(item.dataset.key);
+    });
+    state.selected = next;
+    updateEntrySelectionClasses();
+    updateSelectionInfo();
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragSelect) return;
+    const wasActive = dragSelect.active;
+    dragSelect = null;
+    els.selectionBox.style.display = 'none';
+    if (wasActive) {
+      state.lastClickedIndex = -1;
+      setTimeout(() => { state.suppressNextMainClick = false; }, 0);
+      state.suppressNextMainClick = true;
+    }
+  });
+
   document.getElementById('explorer-main').addEventListener('click', (e) => {
+    if (state.suppressNextMainClick) {
+      state.suppressNextMainClick = false;
+      return;
+    }
     if (e.target.closest('.entry-item')) return;
     if (!e.ctrlKey && !e.metaKey) {
       state.selected.clear();
-      render();
+      updateEntrySelectionClasses();
+      updateSelectionInfo();
     }
   });
 
@@ -443,9 +687,10 @@
     e.preventDefault();
     const fd = new FormData(e.target);
     try {
-      await api('/api/login', { method: 'POST', body: JSON.stringify({ username: fd.get('username'), password: fd.get('password') }) });
+      const data = await api('/api/login', { method: 'POST', body: JSON.stringify({ username: fd.get('username'), password: fd.get('password') }) });
       els.loginModal.style.display = 'none';
-      state.isAdmin = true;
+      state.isAdmin = data.isAdmin;
+      state.user = data.user || null;
       applyAdminUI();
       loadEntries(state.folderId);
       setStatus('已登录');
@@ -459,6 +704,7 @@
   els.btnLogout.addEventListener('click', async () => {
     await api('/api/logout', { method: 'POST' });
     state.isAdmin = false;
+    state.user = null;
     applyAdminUI();
     setStatus('已退出');
   });
@@ -555,7 +801,12 @@
     if (e.key === 'Enter' && state.selected.size === 1) {
       const entry = getSelectedEntries()[0];
       if (entry.type === 'folder') navigate(entry.id);
+      else if (isPreviewable(entry)) openPreview(entry.id);
       else downloadFile(entry.id);
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'l') {
+      e.preventDefault();
+      showPathInput();
     }
   });
 

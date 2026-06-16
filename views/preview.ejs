@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= file.fileName %> - 预览</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/preview.css">
+</head>
+<body class="preview-page">
+  <div class="preview-app">
+    <header class="preview-toolbar">
+      <div class="preview-title">
+        <a class="tb-btn" href="/" title="返回文件列表">←</a>
+        <div>
+          <h1><%= file.fileName %></h1>
+          <div class="preview-meta"><%= previewType === 'json' ? 'JSON' : 'TXT' %> · <%= file.size %> bytes</div>
+        </div>
+      </div>
+      <div class="preview-actions">
+        <div class="preview-search" id="preview-search">
+          <input type="search" id="preview-search-input" placeholder="搜索..." autocomplete="off">
+          <span id="preview-search-count">0/0</span>
+          <button type="button" class="tb-btn" id="preview-search-prev" title="上一个">↑</button>
+          <button type="button" class="tb-btn" id="preview-search-next" title="下一个">↓</button>
+        </div>
+        <a class="tb-btn" href="/download/<%= file.id %>">下载</a>
+      </div>
+    </header>
+
+    <main class="preview-main">
+      <div class="preview-error" id="preview-error" style="display:none"></div>
+      <div class="preview-content" id="preview-content"></div>
+    </main>
+  </div>
+
+  <script>
+    window.PREVIEW_DATA = <%- JSON.stringify({
+      type: previewType,
+      fileName: file.fileName,
+      content,
+      maxSizeMB,
+    }).replace(/</g, '\\u003c') %>;
+  </script>
+  <script src="/js/preview.js"></script>
+</body>
+</html>
