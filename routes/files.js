@@ -1,10 +1,13 @@
 const express = require('express');
 const multer = require('multer');
 const fs = require('fs/promises');
+const path = require('path');
+const crypto = require('crypto');
 const iconv = require('iconv-lite');
 const { loadConfig } = require('../lib/config');
-const { TEMP_DIR } = require('../lib/paths');
+const { TEMP_DIR, sanitizeFileName } = require('../lib/paths');
 const { ensureDir } = require('../lib/fileUtils');
+const { createRarArchive, normalizeZipPath } = require('../lib/archiveService');
 const { isAdmin, currentUser, requireAuth, requireLogin } = require('../middleware/auth');
 const { writeAudit } = require('../lib/auditService');
 const { listEntries } = require('../lib/entryService');
@@ -137,6 +140,81 @@ router.post('/api/upload', requireLogin, (req, res, next) => {
       uploaded: results,
       errors,
     });
+  });
+});
+
+/** POST /api/upload-folder-archive - 文件夹上传后压缩，压缩完成前不可见 */
+router.post('/api/upload-folder-archive', requireLogin, (req, res, next) => {
+  const upload = createUpload().array('files', 10000);
+
+  upload(req, res, async (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        const config = loadConfig();
+        return res.status(400).json({ error: `文件过大，单文件最大 ${config.maxUploadSizeMB || 2048} MB` });
+      }
+      return res.status(400).json({ error: err.message || '上传失败' });
+    }
+
+    const uploadedTempPaths = (req.files || []).map((file) => file.path);
+    let archivePath = '';
+    let stagingDir = '';
+    try {
+      if (!req.files?.length) {
+        return res.status(400).json({ error: '没有收到文件夹内容' });
+      }
+
+      const folderId = normalizeFolderId(req.body.folderId);
+      if (!(await canAccessFolder(req, folderId, 'create'))) {
+        return res.status(403).json({ error: '没有上传权限' });
+      }
+
+      let relativePaths = [];
+      try {
+        relativePaths = JSON.parse(req.body.relativePaths || '[]');
+      } catch {
+        return res.status(400).json({ error: '文件夹路径数据无效' });
+      }
+      if (!Array.isArray(relativePaths) || relativePaths.length !== req.files.length) {
+        return res.status(400).json({ error: '文件夹路径数量不匹配' });
+      }
+
+      const archiveName = sanitizeFileName(
+        (normalizeUploadedFileName(req.body.archiveName || 'folder') || 'folder').replace(/\.(zip|rar)$/i, '') + '.rar'
+      );
+      const entries = req.files.map((file, index) => ({
+        filePath: file.path,
+        relativePath: normalizeZipPath(relativePaths[index] || file.originalname),
+      }));
+
+      await ensureDir(TEMP_DIR);
+      const archiveId = `${Date.now()}-${crypto.randomUUID()}`;
+      archivePath = path.join(TEMP_DIR, `${archiveId}.rar`);
+      stagingDir = path.join(TEMP_DIR, `${archiveId}-rar-src`);
+      await ensureDir(stagingDir);
+      await createRarArchive(entries, archivePath, stagingDir);
+
+      const record = await uploadFile({
+        tempFilePath: archivePath,
+        originalName: archiveName,
+        desc: '文件夹上传后自动压缩为 RAR',
+        folderId,
+      });
+      await writeAudit(req, 'file.upload.folderArchive', {
+        folderId,
+        targetType: 'file',
+        targetId: record.id,
+        targetName: record.fileName,
+      });
+
+      res.json({ success: true, uploaded: [record], archive: record });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    } finally {
+      await Promise.all(uploadedTempPaths.map((filePath) => fs.unlink(filePath).catch(() => {})));
+      if (archivePath) await fs.unlink(archivePath).catch(() => {});
+      if (stagingDir) await fs.rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+    }
   });
 });
 

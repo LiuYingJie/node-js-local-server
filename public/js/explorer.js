@@ -671,6 +671,123 @@
     }
   }
 
+  function getEntryFromItem(item) {
+    return item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+  }
+
+  function readFileEntry(entry) {
+    return new Promise((resolve, reject) => entry.file(resolve, reject));
+  }
+
+  function readDirectoryEntries(entry) {
+    const reader = entry.createReader();
+    const entries = [];
+    return new Promise((resolve, reject) => {
+      const readBatch = () => {
+        reader.readEntries((batch) => {
+          if (!batch.length) {
+            resolve(entries);
+            return;
+          }
+          entries.push(...batch);
+          readBatch();
+        }, reject);
+      };
+      readBatch();
+    });
+  }
+
+  async function collectFolderFiles(entry, rootName = entry.name, parentPath = entry.name) {
+    const children = await readDirectoryEntries(entry);
+    const files = [];
+    for (const child of children) {
+      const childPath = parentPath + '/' + child.name;
+      if (child.isDirectory) {
+        files.push(...await collectFolderFiles(child, rootName, childPath));
+      } else if (child.isFile) {
+        const file = await readFileEntry(child);
+        files.push({ file, relativePath: childPath });
+      }
+    }
+    return files;
+  }
+
+  async function getDroppedItems(dataTransfer) {
+    const items = Array.from(dataTransfer.items || []);
+    if (!items.length || !items.some((item) => getEntryFromItem(item))) {
+      return { files: Array.from(dataTransfer.files || []), folders: [] };
+    }
+
+    const files = [];
+    const folders = [];
+    for (const item of items) {
+      const entry = getEntryFromItem(item);
+      if (!entry) continue;
+      if (entry.isDirectory) {
+        folders.push({
+          name: entry.name,
+          files: await collectFolderFiles(entry),
+        });
+      } else if (entry.isFile) {
+        files.push(await readFileEntry(entry));
+      }
+    }
+    return { files, folders };
+  }
+
+  async function uploadFolderArchive(folder) {
+    if (!state.canWrite || !folder.files.length) return;
+
+    const totalSize = folder.files.reduce((sum, item) => sum + item.file.size, 0);
+    const formData = new FormData();
+    formData.append('archiveName', folder.name + '.rar');
+    formData.append('relativePaths', JSON.stringify(folder.files.map((item) => item.relativePath)));
+    if (state.folderId) formData.append('folderId', state.folderId);
+    folder.files.forEach((item) => formData.append('files', item.file));
+
+    const progressEl = document.createElement('div');
+    progressEl.className = 'upload-progress';
+    progressEl.innerHTML = `上传并压缩 ${escapeHtml(folder.name)}<div class="upload-progress-bar"><div class="upload-progress-bar-inner"></div></div>`;
+    document.body.appendChild(progressEl);
+    const bar = progressEl.querySelector('.upload-progress-bar-inner');
+
+    try {
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/upload-folder-archive');
+        xhr.upload.onprogress = (e) => {
+          if (!e.lengthComputable) return;
+          bar.style.width = Math.min(95, e.loaded / e.total * 95) + '%';
+          if (e.loaded >= e.total) progressEl.firstChild.textContent = `服务端压缩 ${folder.name}...`;
+        };
+        xhr.onload = () => {
+          bar.style.width = '100%';
+          const result = JSON.parse(xhr.responseText || '{}');
+          if (xhr.status >= 200 && xhr.status < 300) resolve(result);
+          else reject(new Error(result.error || '文件夹上传失败'));
+        };
+        xhr.onerror = () => reject(new Error('网络错误'));
+        xhr.send(formData);
+      });
+      setStatus(`已上传压缩包 ${folder.name}.rar (${formatSize(totalSize)})`);
+    } finally {
+      setTimeout(() => progressEl.remove(), 800);
+    }
+  }
+
+  async function uploadDroppedItems(dataTransfer) {
+    const { files, folders } = await getDroppedItems(dataTransfer);
+    if (files.length) await uploadFiles(files);
+    for (const folder of folders) {
+      if (!folder.files.length) {
+        setStatus(`跳过空文件夹: ${folder.name}`);
+        continue;
+      }
+      await uploadFolderArchive(folder);
+    }
+    if (folders.length) loadEntries(state.folderId);
+  }
+
   async function uploadFiles(fileList) {
     if (!state.canWrite || !fileList.length) return;
 
@@ -950,7 +1067,7 @@
     e.preventDefault();
     dragCounter = 0;
     els.dropOverlay.style.display = 'none';
-    if (e.dataTransfer.files.length) uploadFiles([...e.dataTransfer.files]);
+    uploadDroppedItems(e.dataTransfer).catch((err) => alert(err.message));
   });
 
   // 键盘快捷键
