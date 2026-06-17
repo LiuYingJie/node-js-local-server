@@ -1,6 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const fs = require('fs/promises');
+const iconv = require('iconv-lite');
 const { loadConfig } = require('../lib/config');
 const { TEMP_DIR } = require('../lib/paths');
 const { ensureDir } = require('../lib/fileUtils');
@@ -32,6 +33,25 @@ function createUpload() {
   const config = loadConfig();
   const maxSize = (config.maxUploadSizeMB || 2048) * 1024 * 1024;
   return multer({ storage, limits: { fileSize: maxSize } });
+}
+
+function normalizeUploadedFileName(fileName) {
+  const name = String(fileName || '');
+  const candidates = [
+    Buffer.from(name, 'latin1').toString('utf8'),
+    iconv.decode(iconv.encode(name, 'win1252'), 'utf8'),
+  ];
+  const looksMojibake = /[ÃÂâäåæçèéï]|[\u0080-\u009F\u2018-\u201D\u2020-\u2026]/.test(name);
+  if (!looksMojibake) return name;
+  const decoded = candidates.find((candidate) => (
+    candidate
+    && candidate !== name
+    && !candidate.includes('\uFFFD')
+    && /[\u3400-\u9FFF]/.test(candidate)
+    && !/[\x00-\x08\x0E-\x1F\x7F]/.test(candidate)
+  ));
+  if (decoded) return decoded;
+  return name;
 }
 
 /** GET /api/session */
@@ -94,7 +114,7 @@ router.post('/api/upload', requireLogin, (req, res, next) => {
       try {
         const record = await uploadFile({
           tempFilePath: file.path,
-          originalName: file.originalname,
+          originalName: normalizeUploadedFileName(file.originalname),
           desc: (req.body.desc || '').trim(),
           folderId,
         });

@@ -158,6 +158,60 @@
   line-height: 18px;
 }
 
+.word-rich-editor {
+  width: min(920px, calc(100% - 32px));
+  min-height: calc(100vh - 108px);
+  margin: 0 auto 24px;
+  padding: 28px 34px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  color: #111827;
+  font-family: Arial, "Microsoft YaHei", sans-serif;
+  line-height: 1.65;
+  outline: none;
+}
+
+.word-rich-editor table {
+  border-collapse: collapse;
+  max-width: 100%;
+}
+
+.word-rich-editor td,
+.word-rich-editor th {
+  border: 1px solid #d1d5db;
+  padding: 4px 6px;
+}
+
+.word-rich-editor img {
+  max-width: 100%;
+}
+
+.word-rich-editor:focus {
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.16);
+}
+
+.sheet-editor {
+  width: calc(100% - 32px);
+  height: calc(100vh - 108px);
+  margin: 0 16px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+
+.sheet-edit-head {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
 .json-edit-line {
   display: grid;
   grid-template-columns: 24px 54px minmax(0, 1fr);
@@ -278,6 +332,119 @@
   border-left: 1px solid var(--border);
   margin-left: 7px;
   padding-left: 11px;
+}
+
+.word-preview {
+  width: min(920px, calc(100% - 32px));
+  margin: 0 auto 24px;
+  padding: 28px 34px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: #111827;
+  font-family: Arial, "Microsoft YaHei", sans-serif;
+  line-height: 1.65;
+}
+
+.word-preview table {
+  border-collapse: collapse;
+  max-width: 100%;
+}
+
+.word-preview td,
+.word-preview th {
+  border: 1px solid #d1d5db;
+  padding: 4px 6px;
+}
+
+.word-preview img {
+  max-width: 100%;
+}
+
+.word-text-preview {
+  font-family: Consolas, Monaco, 'Courier New', "Microsoft YaHei", monospace;
+}
+
+.sheet-preview,
+.sheet-empty {
+  width: calc(100% - 32px);
+  margin: 0 16px;
+}
+
+.sheet-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+  overflow-x: auto;
+}
+
+.sheet-tab {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.sheet-tab.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.sheet-scroll {
+  overflow: auto;
+  height: calc(100vh - 150px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.sheet-scroll table {
+  border-collapse: collapse;
+  min-width: 100%;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.sheet-scroll th,
+.sheet-scroll td {
+  min-width: 96px;
+  max-width: 320px;
+  height: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  white-space: pre-wrap;
+  word-break: break-word;
+  vertical-align: top;
+}
+
+.sheet-scroll th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  min-width: 44px;
+  background: var(--surface2);
+  color: var(--text-muted);
+  text-align: center;
+  user-select: none;
+}
+
+.sheet-scroll tr th:first-child {
+  left: 0;
+  z-index: 2;
+}
+
+.sheet-scroll td[contenteditable="true"] {
+  outline: none;
+  cursor: text;
+}
+
+.sheet-scroll td[contenteditable="true"]:focus {
+  background: rgba(59, 130, 246, 0.14);
+  box-shadow: inset 0 0 0 1px var(--primary);
 }
 
 mark.search-hit {

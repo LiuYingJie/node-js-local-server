@@ -8,16 +8,17 @@ const { canAccessFolder } = require('../lib/permissionService');
 const { writeAudit } = require('../lib/auditService');
 const { computeMd5, getFileSize, formatDateTime } = require('../lib/fileUtils');
 const { FILES_JSON } = require('../lib/paths');
+const {
+  getPreviewType,
+  readWordPreview,
+  writeDocPlainText,
+  writeDocxPlainText,
+  readSpreadsheetPreview,
+  writeSpreadsheetSheet,
+} = require('../lib/officeService');
 
 const router = express.Router();
 const PREVIEW_MAX_SIZE = 5 * 1024 * 1024;
-
-function getPreviewType(fileName) {
-  const ext = (fileName || '').split('.').pop()?.toLowerCase();
-  if (ext === 'txt') return 'text';
-  if (ext === 'json') return 'json';
-  return null;
-}
 
 router.get('/preview/:id', async (req, res, next) => {
   try {
@@ -34,11 +35,21 @@ router.get('/preview/:id', async (req, res, next) => {
       return res.status(403).send('没有访问权限');
     }
 
-    const content = await fsPromises.readFile(filePath, 'utf-8');
+    let content = '';
+    let office = null;
+    if (previewType === 'text' || previewType === 'json') {
+      content = await fsPromises.readFile(filePath, 'utf-8');
+    } else if (previewType === 'doc' || previewType === 'docx') {
+      office = await readWordPreview(filePath, previewType);
+      content = office.text || '';
+    } else if (previewType === 'spreadsheet') {
+      office = readSpreadsheetPreview(filePath);
+    }
     const canEdit = await canAccessFolder(req, file.folderId ?? null, 'update');
     res.render('preview', {
       file,
       content,
+      office,
       previewType,
       canEdit,
       maxSizeMB: PREVIEW_MAX_SIZE / 1024 / 1024,
@@ -59,21 +70,41 @@ router.put('/api/files/:id/content', requireLogin, express.json({ limit: '6mb' }
       return res.status(403).json({ error: '没有修改权限' });
     }
 
-    let content = String(req.body?.content ?? '');
-    if (Buffer.byteLength(content, 'utf8') > PREVIEW_MAX_SIZE) {
-      return res.status(413).json({ error: '内容过大，不能保存' });
-    }
-    if (previewType === 'json') {
-      try {
-        content = JSON.stringify(JSON.parse(content), null, 2) + '\n';
-      } catch (err) {
-        return res.status(400).json({ error: 'JSON 格式错误: ' + err.message });
-      }
-    }
-
     const filePath = getFilePath(file);
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: '文件不存在' });
-    await fsPromises.writeFile(filePath, content, 'utf-8');
+    let content = '';
+    let office = null;
+    if (previewType === 'spreadsheet') {
+      writeSpreadsheetSheet(filePath, req.body?.sheetName, req.body?.rows);
+      office = readSpreadsheetPreview(filePath);
+    } else if (previewType === 'doc') {
+      content = String(req.body?.content ?? '');
+      if (Buffer.byteLength(content, 'utf8') > PREVIEW_MAX_SIZE) {
+        return res.status(413).json({ error: '内容过大，不能保存' });
+      }
+      await writeDocPlainText(filePath, content);
+      office = { text: content, messages: ['已保存为纯文本 Word 兼容格式，原有复杂格式不会保留'] };
+    } else if (previewType === 'docx') {
+      content = String(req.body?.content ?? '');
+      if (Buffer.byteLength(content, 'utf8') > PREVIEW_MAX_SIZE) {
+        return res.status(413).json({ error: '内容过大，不能保存' });
+      }
+      await writeDocxPlainText(filePath, content);
+      office = await readWordPreview(filePath, previewType);
+    } else {
+      content = String(req.body?.content ?? '');
+      if (Buffer.byteLength(content, 'utf8') > PREVIEW_MAX_SIZE) {
+        return res.status(413).json({ error: '内容过大，不能保存' });
+      }
+      if (previewType === 'json') {
+        try {
+          content = JSON.stringify(JSON.parse(content), null, 2) + '\n';
+        } catch (err) {
+          return res.status(400).json({ error: 'JSON 格式错误: ' + err.message });
+        }
+      }
+      await fsPromises.writeFile(filePath, content, 'utf-8');
+    }
 
     const raw = await fsPromises.readFile(FILES_JSON, 'utf-8');
     const list = JSON.parse(raw);
@@ -92,7 +123,7 @@ router.put('/api/files/:id/content', requireLogin, express.json({ limit: '6mb' }
       targetName: file.fileName,
     });
 
-    res.json({ success: true, content, file: record || file });
+    res.json({ success: true, content, office, file: record || file });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

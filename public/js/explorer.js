@@ -2,8 +2,15 @@
  * 文件夹式文件管理器
  */
 (function () {
+  const LAST_FOLDER_KEY = 'explorer:lastFolderId';
+
+  function readStoredFolderId() {
+    const value = localStorage.getItem(LAST_FOLDER_KEY);
+    return value && value !== 'null' ? value : null;
+  }
+
   const state = {
-    folderId: null,
+    folderId: readStoredFolderId(),
     folders: [],
     files: [],
     breadcrumb: [],
@@ -11,7 +18,7 @@
     viewMode: localStorage.getItem('viewMode') || 'grid',
     isAdmin: false,
     canWrite: false,
-    navHistory: [null],
+    navHistory: [readStoredFolderId()],
     navIndex: 0,
     lastClickedIndex: -1,
     filtered: null,
@@ -80,7 +87,7 @@
   }
 
   function isPreviewable(entry) {
-    return entry?.type === 'file' && ['txt', 'json'].includes(getExt(entry.name));
+    return entry?.type === 'file' && ['txt', 'json', 'doc', 'docx', 'xls', 'xlsx'].includes(getExt(entry.name));
   }
 
   function keyOf(entry) {
@@ -148,24 +155,40 @@
     applyAdminUI();
   }
 
-  async function loadEntries(folderId) {
-    const q = folderId ? '?folderId=' + encodeURIComponent(folderId) : '';
-    const data = await api('/api/entries' + q);
-    state.folderId = data.folderId;
-    state.folders = data.folders;
-    state.files = data.files;
-    state.breadcrumb = data.breadcrumb;
-    state.isAdmin = data.isAdmin;
-    state.canWrite = Boolean(data.canWrite);
-    state.user = data.user || state.user;
-    state.filtered = null;
-    state.selected.clear();
-    state.lastClickedIndex = -1;
-    els.searchInput.value = '';
-    applyAdminUI();
-    render();
-    setStatus(`${state.folders.length + state.files.length} 项`);
-    els.btnUp.disabled = !state.folderId;
+  async function loadEntries(folderId, options = {}) {
+    const fallbackToRoot = options.fallbackToRoot !== false;
+    try {
+      const q = folderId ? '?folderId=' + encodeURIComponent(folderId) : '';
+      const data = await api('/api/entries' + q);
+      state.folderId = data.folderId;
+      state.folders = data.folders;
+      state.files = data.files;
+      state.breadcrumb = data.breadcrumb;
+      state.isAdmin = data.isAdmin;
+      state.canWrite = Boolean(data.canWrite);
+      state.user = data.user || state.user;
+      state.filtered = null;
+      state.selected.clear();
+      state.lastClickedIndex = -1;
+      els.searchInput.value = '';
+      if (state.folderId) localStorage.setItem(LAST_FOLDER_KEY, state.folderId);
+      else localStorage.removeItem(LAST_FOLDER_KEY);
+      applyAdminUI();
+      render();
+      setStatus(`${state.folders.length + state.files.length} 项`);
+      els.btnUp.disabled = !state.folderId;
+    } catch (err) {
+      if (folderId && fallbackToRoot) {
+        localStorage.removeItem(LAST_FOLDER_KEY);
+        state.navHistory = [null];
+        state.navIndex = 0;
+        els.btnBack.disabled = true;
+        await loadEntries(null, { fallbackToRoot: false });
+        setStatus(`上次目录不可用，已返回根目录: ${err.message}`);
+        return;
+      }
+      throw err;
+    }
   }
 
   function navigate(folderId, pushHistory = true) {
@@ -175,7 +198,7 @@
       state.navIndex = state.navHistory.length - 1;
     }
     els.btnBack.disabled = state.navIndex <= 0;
-    loadEntries(folderId);
+    loadEntries(folderId).catch((err) => setStatus('加载失败: ' + err.message));
   }
 
   function renderBreadcrumb() {
@@ -786,7 +809,7 @@
     if (state.navIndex > 0) {
       state.navIndex--;
       els.btnBack.disabled = state.navIndex <= 0;
-      loadEntries(state.navHistory[state.navIndex]);
+      loadEntries(state.navHistory[state.navIndex]).catch((err) => setStatus('加载失败: ' + err.message));
     }
   });
 
@@ -925,5 +948,5 @@
   });
 
   // 初始化
-  loadSession().then(() => loadEntries(null)).catch((err) => setStatus('加载失败: ' + err.message));
+  loadSession().then(() => loadEntries(state.folderId)).catch((err) => setStatus('加载失败: ' + err.message));
 })();

@@ -11,3 +11,6 @@ storage/temp/
 storage/files/*
 !storage/files/.gitkeep
 uploads/
+
+
+/tmp

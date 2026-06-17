@@ -14,7 +14,7 @@
         <a class="tb-btn" href="/" title="返回文件列表">←</a>
         <div>
           <h1><%= file.fileName %></h1>
-          <div class="preview-meta"><%= previewType === 'json' ? 'JSON' : 'TXT' %> · <%= file.size %> bytes</div>
+          <div class="preview-meta"><%= previewType.toUpperCase() %> · <%= file.size %> bytes</div>
         </div>
       </div>
       <div class="preview-actions">
@@ -37,6 +37,8 @@
       <div class="preview-error" id="preview-error" style="display:none"></div>
       <textarea class="preview-editor" id="preview-editor" spellcheck="false" style="display:none"></textarea>
       <div class="json-code-editor" id="json-code-editor" style="display:none"></div>
+      <div class="word-rich-editor" id="word-rich-editor" contenteditable="true" spellcheck="false" style="display:none"></div>
+      <div class="sheet-editor" id="sheet-editor" style="display:none"></div>
       <div class="preview-content" id="preview-content"></div>
     </main>
   </div>
@@ -47,6 +49,7 @@
       fileId: file.id,
       fileName: file.fileName,
       content,
+      office,
       canEdit,
       maxSizeMB,
     }).replace(/</g, '\\u003c') %>;

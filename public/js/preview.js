@@ -9,6 +9,8 @@
     next: document.getElementById('preview-search-next'),
     editor: document.getElementById('preview-editor'),
     jsonEditor: document.getElementById('json-code-editor'),
+    wordRichEditor: document.getElementById('word-rich-editor'),
+    sheetEditor: document.getElementById('sheet-editor'),
     btnEdit: document.getElementById('btn-edit'),
     btnSave: document.getElementById('btn-save'),
     btnCancelEdit: document.getElementById('btn-cancel-edit'),
@@ -22,6 +24,7 @@
     savedContent: String(data.content || ''),
     editBaseline: '',
     jsonFoldRanges: new Map(),
+    sheetIndex: 0,
   };
 
   function escapeHtml(value) {
@@ -135,8 +138,79 @@
     }
   }
 
+  function getActiveSheet() {
+    return data.office?.sheets?.[state.sheetIndex] || data.office?.sheets?.[0] || { name: '', rows: [] };
+  }
+
+  function normalizeRows(rows) {
+    const maxCols = Math.max(1, ...rows.map((row) => Array.isArray(row) ? row.length : 0));
+    const minRows = Math.max(20, rows.length);
+    const result = [];
+    for (let r = 0; r < minRows; r++) {
+      const row = Array.isArray(rows[r]) ? rows[r] : [];
+      const next = [];
+      for (let c = 0; c < maxCols; c++) next.push(row[c] == null ? '' : String(row[c]));
+      result.push(next);
+    }
+    return result;
+  }
+
+  function columnName(index) {
+    let n = index + 1;
+    let name = '';
+    while (n > 0) {
+      const rem = (n - 1) % 26;
+      name = String.fromCharCode(65 + rem) + name;
+      n = Math.floor((n - 1) / 26);
+    }
+    return name;
+  }
+
+  function renderWord() {
+    const office = data.office || {};
+    if (data.type === 'docx') {
+      els.content.innerHTML = `<article class="word-preview">${office.html || '<p>没有可预览的内容</p>'}</article>`;
+      return;
+    }
+    const lines = String(office.text || '').split(/\r?\n/);
+    els.content.innerHTML = `<div class="word-text-preview">${lines.map((line) => `
+      <div class="text-line" data-search-text="${escapeHtml(line)}">
+        <span class="line-no"></span>
+        <span class="line-text">${highlight(line) || ' '}</span>
+      </div>
+    `).join('')}</div>`;
+  }
+
+  function renderSpreadsheet() {
+    const sheets = data.office?.sheets || [];
+    if (!sheets.length) {
+      els.content.innerHTML = '<div class="sheet-empty">没有可预览的工作表</div>';
+      return;
+    }
+    const active = getActiveSheet();
+    const rows = normalizeRows(active.rows || []);
+    const maxCols = rows[0]?.length || 1;
+    const tabs = sheets.map((sheet, index) => `
+      <button type="button" class="sheet-tab${index === state.sheetIndex ? ' active' : ''}" data-sheet-index="${index}">${escapeHtml(sheet.name)}</button>
+    `).join('');
+    const header = '<tr><th></th>' + Array.from({ length: maxCols }, (_, i) => `<th>${columnName(i)}</th>`).join('') + '</tr>';
+    const body = rows.map((row, r) => `<tr><th>${r + 1}</th>${row.map((cell) => `<td>${highlight(cell)}</td>`).join('')}</tr>`).join('');
+    els.content.innerHTML = `<div class="sheet-preview">
+      <div class="sheet-tabs">${tabs}</div>
+      <div class="sheet-scroll"><table>${header}${body}</table></div>
+    </div>`;
+    els.content.querySelectorAll('.sheet-tab').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.sheetIndex = Number(btn.dataset.sheetIndex);
+        render();
+      });
+    });
+  }
+
   function render() {
     if (data.type === 'json') renderJson();
+    else if (data.type === 'doc' || data.type === 'docx') renderWord();
+    else if (data.type === 'spreadsheet') renderSpreadsheet();
     else renderText();
     collectHits();
   }
@@ -180,6 +254,45 @@
     }).join('');
   }
 
+  function renderWordRichEditor() {
+    els.wordRichEditor.innerHTML = data.office?.html || escapeHtml(state.savedContent).replace(/\r?\n/g, '<br>');
+    state.editBaseline = getWordRichEditorText();
+  }
+
+  function getWordRichEditorText() {
+    const clone = els.wordRichEditor.cloneNode(true);
+    clone.querySelectorAll('img').forEach((img) => img.remove());
+    return clone.innerText.replace(/\u00a0/g, ' ').trim();
+  }
+
+  function renderSheetEditor() {
+    const active = getActiveSheet();
+    const rows = normalizeRows(active.rows || []);
+    const maxCols = rows[0]?.length || 1;
+    state.editBaseline = JSON.stringify(rows);
+    const header = '<tr><th></th>' + Array.from({ length: maxCols }, (_, i) => `<th>${columnName(i)}</th>`).join('') + '<th>+</th></tr>';
+    const body = rows.map((row, r) => `<tr><th>${r + 1}</th>${row.map((cell, c) => (
+      `<td contenteditable="true" data-row="${r}" data-col="${c}" spellcheck="false">${escapeHtml(cell)}</td>`
+    )).join('')}<th></th></tr>`).join('');
+    els.sheetEditor.innerHTML = `<div class="sheet-edit-head">${escapeHtml(active.name)}</div><div class="sheet-scroll"><table>${header}${body}</table></div>`;
+  }
+
+  function getSheetEditorRows() {
+    const rows = [];
+    els.sheetEditor.querySelectorAll('td[data-row][data-col]').forEach((cell) => {
+      const r = Number(cell.dataset.row);
+      const c = Number(cell.dataset.col);
+      if (!rows[r]) rows[r] = [];
+      rows[r][c] = cell.textContent;
+    });
+    while (rows.length && rows[rows.length - 1].every((cell) => !String(cell || '').trim())) rows.pop();
+    return rows.map((row) => {
+      const next = row || [];
+      while (next.length && !String(next[next.length - 1] || '').trim()) next.pop();
+      return next;
+    });
+  }
+
   function getJsonEditorContent() {
     return Array.from(els.jsonEditor.querySelectorAll('.json-edit-text'))
       .map((line) => line.textContent.replace(/\u00a0/g, ''))
@@ -208,9 +321,13 @@
     if (!data.canEdit) return;
     state.editing = editing;
     const jsonEditing = editing && data.type === 'json';
-    const textEditing = editing && data.type !== 'json';
+    const sheetEditing = editing && data.type === 'spreadsheet';
+    const richWordEditing = editing && data.type === 'docx';
+    const textEditing = editing && data.type !== 'json' && data.type !== 'spreadsheet' && data.type !== 'docx';
     els.editor.style.display = textEditing ? 'block' : 'none';
     els.jsonEditor.style.display = jsonEditing ? 'block' : 'none';
+    els.wordRichEditor.style.display = richWordEditing ? 'block' : 'none';
+    els.sheetEditor.style.display = sheetEditing ? 'block' : 'none';
     els.content.style.display = editing ? 'none' : 'block';
     els.btnEdit.style.display = editing ? 'none' : 'inline-flex';
     els.btnSave.style.display = editing ? 'inline-flex' : 'none';
@@ -220,6 +337,12 @@
       if (jsonEditing) {
         renderJsonEditor();
         els.jsonEditor.querySelector('.json-edit-text')?.focus();
+      } else if (sheetEditing) {
+        renderSheetEditor();
+        els.sheetEditor.querySelector('td[contenteditable="true"]')?.focus();
+      } else if (richWordEditing) {
+        renderWordRichEditor();
+        els.wordRichEditor.focus();
       } else {
         els.editor.value = state.savedContent;
         state.editBaseline = state.savedContent;
@@ -230,17 +353,28 @@
 
   async function saveContent() {
     if (!state.editing) return;
-    const content = data.type === 'json' ? getJsonEditorContent() : els.editor.value;
+    const spreadsheetEditing = data.type === 'spreadsheet';
+    const content = data.type === 'json'
+      ? getJsonEditorContent()
+      : (data.type === 'docx' ? getWordRichEditorText() : els.editor.value);
+    const body = spreadsheetEditing
+      ? { sheetName: getActiveSheet().name, rows: getSheetEditorRows() }
+      : { content };
     try {
       const res = await fetch('/api/files/' + encodeURIComponent(data.fileId) + '/content', {
         method: 'PUT',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify(body),
       });
       const result = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(result.error || '保存失败');
-      data.content = result.content;
-      state.savedContent = result.content;
+      if (spreadsheetEditing) {
+        data.office = result.office;
+      } else {
+        data.content = result.content;
+        state.savedContent = result.content;
+        if (result.office) data.office = result.office;
+      }
       setEditing(false);
       render();
       setStatus('已保存');
@@ -302,7 +436,9 @@
   els.next.addEventListener('click', () => moveHit(1));
   els.btnEdit?.addEventListener('click', () => setEditing(true));
   els.btnCancelEdit?.addEventListener('click', () => {
-    const currentContent = data.type === 'json' ? getJsonEditorContent() : els.editor.value;
+    const currentContent = data.type === 'spreadsheet'
+      ? JSON.stringify(getSheetEditorRows())
+      : (data.type === 'json' ? getJsonEditorContent() : (data.type === 'docx' ? getWordRichEditorText() : els.editor.value));
     if (currentContent !== state.editBaseline && !confirm('放弃未保存的修改？')) return;
     setEditing(false);
     setStatus('');
