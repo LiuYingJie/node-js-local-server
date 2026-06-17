@@ -59,13 +59,36 @@
   };
 
   const FILE_ICONS = {
-    zip: '📦', rar: '📦', '7z': '📦',
-    exe: '⚙️', dll: '🔧', msi: '⚙️',
-    json: '📋', txt: '📄', ini: '📋', yaml: '📋', yml: '📋', xml: '📋',
-    png: '🖼️', jpg: '🖼️', jpeg: '🖼️', gif: '🖼️', webp: '🖼️', svg: '🖼️',
-    pdf: '📕', doc: '📘', docx: '📘', xls: '📗', xlsx: '📗',
-    mp4: '🎬', mp3: '🎵', wav: '🎵',
-    js: '📜', ts: '📜', html: '🌐', css: '🎨',
+    txt: { label: 'TXT', tone: 'text' },
+    ini: { label: 'INI', tone: 'text' },
+    json: { label: 'JSON', tone: 'code' },
+    yaml: { label: 'YML', tone: 'code' },
+    yml: { label: 'YML', tone: 'code' },
+    xml: { label: 'XML', tone: 'code' },
+    js: { label: 'JS', tone: 'code' },
+    ts: { label: 'TS', tone: 'code' },
+    html: { label: 'HTML', tone: 'web' },
+    css: { label: 'CSS', tone: 'web' },
+    doc: { label: 'W', tone: 'word' },
+    docx: { label: 'W', tone: 'word' },
+    xls: { label: 'X', tone: 'excel' },
+    xlsx: { label: 'X', tone: 'excel' },
+    pdf: { label: 'PDF', tone: 'pdf' },
+    png: { label: 'IMG', tone: 'image' },
+    jpg: { label: 'IMG', tone: 'image' },
+    jpeg: { label: 'IMG', tone: 'image' },
+    gif: { label: 'GIF', tone: 'image' },
+    webp: { label: 'IMG', tone: 'image' },
+    svg: { label: 'SVG', tone: 'image' },
+    zip: { label: 'ZIP', tone: 'archive' },
+    rar: { label: 'RAR', tone: 'archive' },
+    '7z': { label: '7Z', tone: 'archive' },
+    exe: { label: 'EXE', tone: 'app' },
+    dll: { label: 'DLL', tone: 'app' },
+    msi: { label: 'MSI', tone: 'app' },
+    mp4: { label: 'MP4', tone: 'media' },
+    mp3: { label: 'MP3', tone: 'media' },
+    wav: { label: 'WAV', tone: 'media' },
   };
 
   function formatSize(bytes) {
@@ -82,8 +105,11 @@
   }
 
   function getIcon(entry) {
-    if (entry.type === 'folder') return entry.private ? '🔒' : '📁';
-    return FILE_ICONS[getExt(entry.name)] || '📄';
+    if (entry.type === 'folder') {
+      return `<span class="win-folder-icon${entry.private ? ' private' : ''}"></span>`;
+    }
+    const config = FILE_ICONS[getExt(entry.name)] || { label: 'FILE', tone: 'generic' };
+    return `<span class="win-file-icon ${config.tone}"><span class="file-fold"></span><span class="file-mark">${config.label}</span></span>`;
   }
 
   function isPreviewable(entry) {

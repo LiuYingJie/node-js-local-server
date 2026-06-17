@@ -196,17 +196,153 @@
 }
 
 .entry-icon {
-  font-size: 2.5rem;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
   margin-bottom: 8px;
   pointer-events: none;
 }
 
 .entry-grid.view-list .entry-icon {
-  font-size: 1.5rem;
   margin-bottom: 0;
   width: 32px;
+  height: 32px;
   text-align: center;
+}
+
+.win-file-icon {
+  position: relative;
+  display: block;
+  width: 38px;
+  height: 46px;
+  border: 1px solid rgba(148, 163, 184, 0.75);
+  border-radius: 3px;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.16);
+}
+
+.win-file-icon::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  top: 12px;
+  height: 2px;
+  background: #cbd5e1;
+  box-shadow: 0 7px 0 #cbd5e1, 0 14px 0 #cbd5e1;
+}
+
+.win-file-icon .file-fold {
+  position: absolute;
+  right: -1px;
+  top: -1px;
+  width: 13px;
+  height: 13px;
+  background: linear-gradient(135deg, #e2e8f0 0%, #ffffff 45%, #cbd5e1 46%, #e2e8f0 100%);
+  border-left: 1px solid rgba(148, 163, 184, 0.8);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.8);
+}
+
+.win-file-icon .file-mark {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  min-height: 15px;
+  padding: 1px 2px;
+  border-radius: 2px;
+  color: #fff;
+  font-size: 9px;
+  line-height: 13px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0;
+  background: #64748b;
+}
+
+.win-file-icon.word .file-mark { background: #185abd; }
+.win-file-icon.excel .file-mark { background: #107c41; }
+.win-file-icon.pdf .file-mark { background: #c8202f; }
+.win-file-icon.image .file-mark { background: #7c3aed; }
+.win-file-icon.archive .file-mark { background: #b7791f; }
+.win-file-icon.code .file-mark { background: #2563eb; }
+.win-file-icon.web .file-mark { background: #0f766e; }
+.win-file-icon.app .file-mark { background: #475569; }
+.win-file-icon.media .file-mark { background: #db2777; }
+.win-file-icon.text .file-mark { background: #64748b; }
+
+.win-folder-icon {
+  position: relative;
+  display: block;
+  width: 46px;
+  height: 34px;
+  margin-top: 7px;
+  border-radius: 3px 5px 5px 5px;
+  background: linear-gradient(180deg, #ffd965 0%, #f6c142 52%, #d99a18 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 1px 2px rgba(15, 23, 42, 0.18);
+}
+
+.win-folder-icon::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: -7px;
+  width: 20px;
+  height: 10px;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(180deg, #ffe08a 0%, #f4c64c 100%);
+}
+
+.win-folder-icon.private::after {
+  content: "";
+  position: absolute;
+  right: 6px;
+  bottom: 5px;
+  width: 11px;
+  height: 8px;
+  border-radius: 2px;
+  background: #334155;
+  box-shadow: 0 -5px 0 -2px #334155;
+}
+
+.entry-grid.view-list .win-file-icon {
+  width: 25px;
+  height: 30px;
+}
+
+.entry-grid.view-list .win-file-icon::before {
+  left: 5px;
+  right: 5px;
+  top: 9px;
+  box-shadow: 0 5px 0 #cbd5e1, 0 10px 0 #cbd5e1;
+}
+
+.entry-grid.view-list .win-file-icon .file-fold {
+  width: 9px;
+  height: 9px;
+}
+
+.entry-grid.view-list .win-file-icon .file-mark {
+  left: 3px;
+  right: 3px;
+  bottom: 3px;
+  min-height: 10px;
+  font-size: 6px;
+  line-height: 9px;
+}
+
+.entry-grid.view-list .win-folder-icon {
+  width: 30px;
+  height: 22px;
+  margin-top: 5px;
+}
+
+.entry-grid.view-list .win-folder-icon::before {
+  top: -5px;
+  width: 14px;
+  height: 7px;
 }
 
 .entry-name {
