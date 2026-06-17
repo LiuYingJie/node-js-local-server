@@ -217,6 +217,96 @@
   word-break: break-all;
 }
 
+.maintenance-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.maintenance-message {
+  margin-bottom: 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface2);
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
+.maintenance-message.info {
+  border-color: rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.1);
+  color: #93c5fd;
+}
+
+.maintenance-message.ok {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--success);
+}
+
+.maintenance-message.warn {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning);
+}
+
+.maintenance-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.maintenance-grid strong {
+  font-size: 0.92rem;
+  word-break: break-all;
+}
+
+.success-text {
+  color: var(--success);
+}
+
+.danger-text {
+  color: var(--danger);
+}
+
+.maintenance-dirty {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.maintenance-dirty code {
+  color: var(--text);
+  font-family: Consolas, Monaco, 'Courier New', monospace;
+  font-size: 0.78rem;
+}
+
+.maintenance-log {
+  min-height: 260px;
+  max-height: calc(100vh - 260px);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #0b1117;
+  color: var(--text);
+  font-family: Consolas, Monaco, 'Courier New', monospace;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
 .user-modal-box {
   max-width: 760px;
 }
@@ -282,6 +372,7 @@
 
   .audit-filters,
   .form-grid,
+  .maintenance-grid,
   .permission-row {
     grid-template-columns: 1fr;
   }

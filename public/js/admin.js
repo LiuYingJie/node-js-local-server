@@ -23,6 +23,11 @@
     filterFrom: document.getElementById('filter-from'),
     filterTo: document.getElementById('filter-to'),
     btnRefreshLogs: document.getElementById('btn-refresh-logs'),
+    maintenanceStatus: document.getElementById('maintenance-status'),
+    maintenanceLog: document.getElementById('maintenance-log'),
+    maintenanceMessage: document.getElementById('maintenance-message'),
+    btnRefreshMaintenance: document.getElementById('btn-refresh-maintenance'),
+    btnRunMaintenance: document.getElementById('btn-run-maintenance'),
   };
 
   const ACTION_LABELS = { create: '增', delete: '删', update: '改', read: '查' };
@@ -45,6 +50,7 @@
   ];
 
   let users = [];
+  let maintenanceState = null;
 
   function escapeHtml(value) {
     return String(value ?? '')
@@ -265,6 +271,77 @@
     </div>`;
   }
 
+  function renderMaintenanceStatus(data) {
+    if (!els.maintenanceStatus) return;
+    maintenanceState = data;
+    const dirtyItems = (data.dirtySummary || []).map((line) => `<code>${escapeHtml(line)}</code>`).join('');
+    els.maintenanceStatus.innerHTML = `
+      <div class="maintenance-grid">
+        <div><span class="text-muted">分支</span><strong>${escapeHtml(data.branch || '-')}</strong></div>
+        <div><span class="text-muted">提交</span><strong>${escapeHtml(data.commit || '-')}</strong></div>
+        <div><span class="text-muted">工作区</span><strong class="${data.dirty ? 'danger-text' : 'success-text'}">${data.dirty ? '有未提交改动' : '干净'}</strong></div>
+      </div>
+      ${data.dirty ? `<div class="maintenance-dirty">${dirtyItems}</div>` : ''}
+    `;
+    els.maintenanceLog.textContent = data.log || '暂无日志';
+    if (els.btnRunMaintenance) {
+      els.btnRunMaintenance.title = data.dirty ? '当前项目存在未提交改动，不能执行更新重启' : '';
+    }
+  }
+
+  function setMaintenanceMessage(text, type = '') {
+    if (!els.maintenanceMessage) return;
+    els.maintenanceMessage.textContent = text;
+    els.maintenanceMessage.className = 'maintenance-message' + (type ? ' ' + type : '');
+  }
+
+  async function loadMaintenanceStatus() {
+    if (!els.maintenanceStatus) return;
+    const oldText = els.btnRefreshMaintenance?.textContent;
+    if (els.btnRefreshMaintenance) {
+      els.btnRefreshMaintenance.disabled = true;
+      els.btnRefreshMaintenance.textContent = '刷新中...';
+    }
+    setMaintenanceMessage('正在刷新状态...', 'info');
+    try {
+      const data = await api('/admin/api/maintenance/status');
+      renderMaintenanceStatus(data);
+      setMaintenanceMessage(data.dirty ? '当前有未提交改动，更新重启已被保护拦截。' : '状态已刷新，可以执行更新重启。', data.dirty ? 'warn' : 'ok');
+    } finally {
+      if (els.btnRefreshMaintenance) {
+        els.btnRefreshMaintenance.disabled = false;
+        els.btnRefreshMaintenance.textContent = oldText || '刷新状态';
+      }
+    }
+  }
+
+  async function runMaintenance() {
+    if (maintenanceState?.dirty) {
+      setMaintenanceMessage('不能执行：当前项目存在未提交改动。请先提交、暂存或清理这些改动后再更新。', 'warn');
+      return;
+    }
+    if (!confirm('确认执行 git pull、npm install 并重启服务？执行期间页面可能短暂不可用。')) return;
+    const oldText = els.btnRunMaintenance?.textContent;
+    if (els.btnRunMaintenance) {
+      els.btnRunMaintenance.disabled = true;
+      els.btnRunMaintenance.textContent = '启动中...';
+    }
+    setMaintenanceMessage('正在启动维护任务...', 'info');
+    try {
+      const data = await api('/admin/api/maintenance/update', { method: 'POST', body: JSON.stringify({}) });
+      setMaintenanceMessage(`维护任务已启动: ${data.jobId}。服务重启期间页面可能短暂不可用。`, 'ok');
+      await loadMaintenanceStatus();
+    } catch (err) {
+      setMaintenanceMessage(err.message, 'warn');
+      await loadMaintenanceStatus().catch(() => {});
+    } finally {
+      if (els.btnRunMaintenance) {
+        els.btnRunMaintenance.disabled = false;
+        els.btnRunMaintenance.textContent = oldText || '更新并重启';
+      }
+    }
+  }
+
   document.querySelectorAll('.admin-nav-item').forEach((btn) => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.admin-nav-item').forEach((item) => item.classList.toggle('active', item === btn));
@@ -294,9 +371,11 @@
     loadLogs().catch((err) => alert(err.message));
   });
   els.btnRefreshLogs.addEventListener('click', () => loadLogs().catch((err) => alert(err.message)));
+  els.btnRefreshMaintenance?.addEventListener('click', () => loadMaintenanceStatus().catch((err) => alert(err.message)));
+  els.btnRunMaintenance?.addEventListener('click', () => runMaintenance());
   document.querySelectorAll('.modal-close').forEach((btn) => {
     btn.addEventListener('click', () => btn.closest('.modal').style.display = 'none');
   });
 
-  Promise.all([loadUsers(), loadFolders(), loadLogs()]).catch((err) => alert(err.message));
+  Promise.all([loadUsers(), loadFolders(), loadLogs(), loadMaintenanceStatus()]).catch((err) => alert(err.message));
 })();

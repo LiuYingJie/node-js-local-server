@@ -17,6 +17,9 @@
       <nav class="admin-nav">
         <button type="button" class="admin-nav-item active" data-tab="users">用户与权限</button>
         <button type="button" class="admin-nav-item" data-tab="audit">操作日志</button>
+        <% if (user.role === 'superadmin') { %>
+          <button type="button" class="admin-nav-item" data-tab="maintenance">系统维护</button>
+        <% } %>
       </nav>
       <div class="admin-sidebar-foot">
         <a class="btn btn-secondary btn-sm" href="/">文件管理</a>
@@ -78,6 +81,27 @@
           <div class="audit-list" id="audit-list"></div>
         </div>
       </section>
+
+      <% if (user.role === 'superadmin') { %>
+        <section class="admin-tab" id="tab-maintenance">
+          <div class="content-head">
+            <div>
+              <h2>系统维护</h2>
+              <p>拉取最新代码、安装依赖，并在全部成功后重启服务。</p>
+            </div>
+            <div class="head-actions">
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-refresh-maintenance">刷新状态</button>
+              <button type="button" class="btn btn-danger btn-sm" id="btn-run-maintenance">更新并重启</button>
+            </div>
+          </div>
+
+          <div class="admin-panel">
+            <div class="maintenance-message" id="maintenance-message">就绪</div>
+            <div class="maintenance-status" id="maintenance-status"></div>
+            <pre class="maintenance-log" id="maintenance-log">暂无日志</pre>
+          </div>
+        </section>
+      <% } %>
     </main>
   </div>
 

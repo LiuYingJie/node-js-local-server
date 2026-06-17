@@ -1,8 +1,9 @@
 const express = require('express');
-const { isAdmin, currentUser, requireAuth } = require('../middleware/auth');
+const { isAdmin, currentUser, requireAuth, requireSuperAdmin } = require('../middleware/auth');
 const { listUsers, createUser, updateUser, deleteUser } = require('../lib/userService');
 const { readAuditLog, writeAudit } = require('../lib/auditService');
 const { listAllFoldersFlat } = require('../lib/storagePath');
+const { getMaintenanceStatus, startSelfUpdateJob } = require('../lib/maintenanceService');
 
 const router = express.Router();
 
@@ -77,6 +78,28 @@ router.get('/api/folders', requireAuth, async (req, res, next) => {
     res.json({ folders: await listAllFoldersFlat() });
   } catch (err) {
     next(err);
+  }
+});
+
+router.get('/api/maintenance/status', requireSuperAdmin, async (req, res) => {
+  try {
+    res.json(await getMaintenanceStatus());
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post('/api/maintenance/update', requireSuperAdmin, express.json(), async (req, res) => {
+  try {
+    const job = await startSelfUpdateJob();
+    await writeAudit(req, 'system.maintenance.update', {
+      targetType: 'system',
+      targetId: job.jobId,
+      targetName: 'git pull && npm install && restart',
+    });
+    res.status(202).json({ success: true, ...job });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 
